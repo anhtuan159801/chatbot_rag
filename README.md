@@ -115,11 +115,19 @@ RAGBot Admin Console là một hệ thống quản trị thông minh được x�
    - Chọn "GitHub" và kết nối với repository
    - Chọn repository `chatbot_rag`
    - Cấu hình build:
-     - Build Command: `npm run build`
-     - Run Command: (bỏ trống cho static site)
+     - Build Command: `npm install && npm run build`
+     - Run Command: `npx serve -s dist` (đối với static site)
      - Environment: Node.js
+     - Build Directory: `dist`
    - Thêm biến môi trường nếu cần
    - Bấm "Deploy"
+
+6. Nếu gặp lỗi "no command to run your application", bạn cần:
+   - Cài đặt gói serve: thêm `serve` vào devDependencies trong package.json
+   - Hoặc tạo file `Procfile` trong thư mục gốc với nội dung:
+     ```
+     web: npx serve -s dist
+     ```
 
 ## Cấu hình môi trường
 
