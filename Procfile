@@ -1,1 +1,1 @@
-web: npm run serve-dist
+web: npx serve -s dist
