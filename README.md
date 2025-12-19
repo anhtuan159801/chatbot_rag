@@ -135,8 +135,12 @@ RAGBot Admin Console là một hệ thống quản trị thông minh được x�
      - Trong Koyeb dashboard → App → Settings → "Source code repository", đảm bảo "Root directory" được để trống hoặc là dấu chấm (.)
      - Không đặt "Root directory" thành "dist" hoặc bất kỳ thư mục con nào
      - Không cấu hình "Build path" thành "dist" nếu đang dùng GitHub integration
+   - Nếu gặp lỗi "build step of buildpacks failed with exit code 51":
+     - Lỗi này thường do package-lock.json không đồng bộ với package.json
+     - Trên máy tính của bạn, chạy lệnh: `npm install` để tạo lại package-lock.json đúng
+     - Sau đó commit lại file package-lock.json: `git add package-lock.json && git commit -m "Update package-lock.json" && git push origin main`
    - Nếu ứng dụng vẫn không chạy sau build:
-     - Thử cập nhật "Run command" trong Koyeb dashboard thành: `npx serve -s dist` (thay vì `npm run serve-dist`)
+     - Thử cập nhật "Run command" trong Koyeb dashboard thành: `node server.js` để sử dụng Express server
      - Hoặc đảm bảo script "start" trong package.json được cấu hình đúng để Koyeb có thể sử dụng
    - Nếu gặp lỗi build khác, hãy kiểm tra rằng Node.js version >= 20.0.0 như đã khai báo trong package.json
 
