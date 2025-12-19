@@ -119,14 +119,24 @@ RAGBot Admin Console là một hệ thống quản trị thông minh được x�
      - Run Command: `npx serve -s dist` (đối với static site)
      - Environment: Node.js
      - Build Directory: `dist`
-   - Thêm biến môi trường nếu cần
+   - Thêm biến môi trường nếu cần (VITE_GEMINI_API_KEY, etc.)
    - Bấm "Deploy"
 
-6. Nếu gặp lỗi "no command to run your application", bạn cần:
-   - Cài đặt gói serve: thêm `serve` vào devDependencies trong package.json
-   - Hoặc tạo file `Procfile` trong thư mục gốc với nội dung:
+6. Nếu gặp lỗi "no command to run your application", bạn cần đảm bảo:
+   - File `Procfile` đã tồn tại trong thư mục gốc (đã được tạo sẵn trong repository này)
+   - Hoặc cấu hình đúng Work Directory: để trống hoặc là `/workspace`
+   - Thêm package `serve` vào dependencies trong `package.json`:
+     ```json
+     {
+       "devDependencies": {
+         "serve": "^14.2.0"
+       }
+     }
      ```
-     web: npx serve -s dist
+   - Đảm bảo rằng lệnh build tạo ra thư mục `dist` với nội dung tĩnh
+   - Trong một số trường hợp, bạn có thể cần chạy lệnh sau trong phần "Run Command":
+     ```bash
+     npx serve@latest -s dist
      ```
 
 ## Cấu hình môi trường
