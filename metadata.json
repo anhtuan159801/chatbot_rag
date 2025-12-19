@@ -1,0 +1,5 @@
+{
+  "name": "RAGBot Admin Console",
+  "description": "Administrative dashboard for the RAG-based Facebook Chatbot system. Manage knowledge ingestion, view vector database status, monitor system health, and review chat history.",
+  "requestFramePermissions": []
+}
