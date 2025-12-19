@@ -130,7 +130,14 @@ RAGBot Admin Console là một hệ thống quản trị thông minh được x�
    - Điều này đảm bảo ứng dụng có thể chạy thành công trên Koyeb
    - Nếu gặp lỗi "no command to run your application", kiểm tra lại các cấu hình trên
 
-7. Sau khi deploy thành công:
+7. Khắc phục sự cố thường gặp:
+   - Nếu gặp lỗi "stat /.../dist: no such file or directory": Đây là lỗi cấu hình trên Koyeb dashboard, không phải lỗi trong mã nguồn. Kiểm tra các cài đặt sau:
+     - Trong Koyeb dashboard → App → Settings → "Source code repository", đảm bảo "Root directory" được để trống hoặc là dấu chấm (.)
+     - Không đặt "Root directory" thành "dist" hoặc bất kỳ thư mục con nào
+     - Không cấu hình "Build path" thành "dist" nếu đang dùng GitHub integration
+   - Nếu gặp lỗi build khác, hãy kiểm tra rằng Node.js version >= 20.0.0 như đã khai báo trong package.json
+
+8. Sau khi deploy thành công:
    - Koyeb sẽ cung cấp URL cho ứng dụng (ví dụ: `https://your-app-name-koyeb.app`)
    - Bạn có thể đặt tên miền riêng trong phần "Domains" của Koyeb Dashboard
 
