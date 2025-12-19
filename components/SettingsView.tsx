@@ -215,8 +215,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
             <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Callback URL</label>
                 <div className="flex flex-col md:flex-row gap-2">
-                    <code className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-slate-600 font-mono text-sm break-all">https://api.dichvucong.gov.vn/webhooks/facebook</code>
-                    <button onClick={() => copyToClipboard('https://api.dichvucong.gov.vn/webhooks/facebook', 'url')} className={`px-4 py-3 md:py-0 border rounded-lg transition-all flex items-center justify-center gap-2 ${copiedField === 'url' ? 'bg-green-50 border-green-200 text-green-600' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-500'}`}>{copiedField === 'url' ? <Check size={18} /> : <Copy size={18} />} <span className="md:hidden">Sao chép</span></button>
+                    <code className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-slate-600 font-mono text-sm break-all">https://amazing-enrika-anhtuan150821-6fb89dc1.koyeb.app/webhooks/facebook</code>
+                    <button onClick={() => copyToClipboard('https://amazing-enrika-anhtuan150821-6fb89dc1.koyeb.app/webhooks/facebook', 'url')} className={`px-4 py-3 md:py-0 border rounded-lg transition-all flex items-center justify-center gap-2 ${copiedField === 'url' ? 'bg-green-50 border-green-200 text-green-600' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-500'}`}>{copiedField === 'url' ? <Check size={18} /> : <Copy size={18} />} <span className="md:hidden">Sao chép</span></button>
                 </div>
             </div>
             <div className="space-y-2">
