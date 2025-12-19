@@ -135,6 +135,9 @@ RAGBot Admin Console là một hệ thống quản trị thông minh được x�
      - Trong Koyeb dashboard → App → Settings → "Source code repository", đảm bảo "Root directory" được để trống hoặc là dấu chấm (.)
      - Không đặt "Root directory" thành "dist" hoặc bất kỳ thư mục con nào
      - Không cấu hình "Build path" thành "dist" nếu đang dùng GitHub integration
+   - Nếu ứng dụng vẫn không chạy sau build:
+     - Thử cập nhật "Run command" trong Koyeb dashboard thành: `npx serve -s dist` (thay vì `npm run serve-dist`)
+     - Hoặc đảm bảo script "start" trong package.json được cấu hình đúng để Koyeb có thể sử dụng
    - Nếu gặp lỗi build khác, hãy kiểm tra rằng Node.js version >= 20.0.0 như đã khai báo trong package.json
 
 8. Sau khi deploy thành công:
