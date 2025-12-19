@@ -116,7 +116,7 @@ RAGBot Admin Console là một hệ thống quản trị thông minh được x�
    - Chọn repository `chatbot_rag`
    - Cấu hình build:
      - Build Command: `npm install && npm run build`
-     - Run Command: `npm run serve-dist` (theo cấu hình trong Procfile)
+     - Run Command: `npx serve -s dist` (hoặc `npm run serve-dist`)
      - Environment: Node.js
      - Build Directory: `dist`
    - Thêm biến môi trường nếu cần (VITE_GEMINI_API_KEY, etc.)
