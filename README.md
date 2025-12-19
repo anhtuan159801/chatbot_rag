@@ -124,17 +124,11 @@ RAGBot Admin Console là một hệ thống quản trị thông minh được x�
 
 6. Nếu gặp lỗi "no command to run your application", bạn cần đảm bảo:
    - File `Procfile` đã tồn tại trong thư mục gốc (đã được tạo sẵn trong repository này)
-   - Hoặc cấu hình đúng Work Directory: để trống hoặc là `/workspace`
-   - Thêm package `serve` vào dependencies trong `package.json`:
-     ```json
-     {
-       "devDependencies": {
-         "serve": "^14.2.0"
-       }
-     }
-     ```
+   - Package `serve` đã được thêm vào `devDependencies` trong `package.json` (đã được cấu hình sẵn)
+   - Script `serve-dist` đã được thêm vào `scripts` trong `package.json` (đã được cấu hình sẵn)
+   - Cấu hình đúng Work Directory: để trống hoặc là `/workspace`
    - Đảm bảo rằng lệnh build tạo ra thư mục `dist` với nội dung tĩnh
-   - Trong một số trường hợp, bạn có thể cần chạy lệnh sau trong phần "Run Command":
+   - Trong trường hợp vẫn gặp lỗi, bạn có thể thử chạy lệnh sau trong phần "Run Command":
      ```bash
      npx serve@latest -s dist
      ```
