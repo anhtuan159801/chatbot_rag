@@ -94,7 +94,7 @@ RAGBot Admin Console là một hệ thống quản trị thông minh được x�
 
 1. Tạo tài khoản tại [Koyeb](https://www.koyeb.com)
 
-2. Cài đặt CLI:
+2. Cài đặt CLI (tùy chọn):
    ```bash
    curl -sL https://run.koyeb.app/install | sh
    ```
@@ -116,22 +116,23 @@ RAGBot Admin Console là một hệ thống quản trị thông minh được x�
    - Chọn repository `chatbot_rag`
    - Cấu hình build:
      - Build Command: `npm install && npm run build`
-     - Run Command: `npx serve -s dist` (đối với static site)
+     - Run Command: `npm run serve-dist` (theo cấu hình trong Procfile)
      - Environment: Node.js
      - Build Directory: `dist`
    - Thêm biến môi trường nếu cần (VITE_GEMINI_API_KEY, etc.)
    - Bấm "Deploy"
 
-6. Nếu gặp lỗi "no command to run your application", bạn cần đảm bảo:
-   - File `Procfile` đã tồn tại trong thư mục gốc (đã được tạo sẵn trong repository này)
-   - Package `serve` đã được thêm vào `devDependencies` trong `package.json` (đã được cấu hình sẵn)
-   - Script `serve-dist` đã được thêm vào `scripts` trong `package.json` (đã được cấu hình sẵn)
-   - Cấu hình đúng Work Directory: để trống hoặc là `/workspace`
-   - Đảm bảo rằng lệnh build tạo ra thư mục `dist` với nội dung tĩnh
-   - Trong trường hợp vẫn gặp lỗi, bạn có thể thử chạy lệnh sau trong phần "Run Command":
-     ```bash
-     npx serve@latest -s dist
-     ```
+6. Cấu hình đặc biệt cho ứng dụng này:
+   - Repository này đã được cấu hình sẵn với:
+     - File `Procfile` trong thư mục gốc với nội dung: `web: npm run serve-dist`
+     - Package `serve` đã được thêm vào `dependencies` trong `package.json` (không phải devDependencies)
+     - Script `serve-dist` trong `package.json` để serve thư mục `dist`
+   - Điều này đảm bảo ứng dụng có thể chạy thành công trên Koyeb
+   - Nếu gặp lỗi "no command to run your application", kiểm tra lại các cấu hình trên
+
+7. Sau khi deploy thành công:
+   - Koyeb sẽ cung cấp URL cho ứng dụng (ví dụ: `https://your-app-name-koyeb.app`)
+   - Bạn có thể đặt tên miền riêng trong phần "Domains" của Koyeb Dashboard
 
 ## Cấu hình môi trường
 
