@@ -8,14 +8,18 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
+# Install TypeScript and type definitions for compilation
+RUN npm install -g typescript
+RUN npm install --save-dev @types/express
+
 # Copy source code
 COPY . .
 
-# Install TypeScript for compilation
-RUN npm install -g typescript
+# Compile all server-side TypeScript files to JavaScript
+RUN npx tsc --project tsconfig.server.json
 
-# Compile all server-side TypeScript files to JavaScript in place
-RUN npx tsc services/apiProxy.ts --outDir services --module ES2020 --target ES2020 --moduleResolution node
+# Copy compiled server files to the correct location
+RUN cp -r dist-server/services/* services/ && rm -rf dist-server
 
 # Build the frontend
 RUN npm run build

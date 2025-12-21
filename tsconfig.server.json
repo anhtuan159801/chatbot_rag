@@ -3,20 +3,23 @@
     "target": "ES2020",
     "module": "ES2020",
     "moduleResolution": "node",
-    "outDir": "./services",
-    "rootDir": "./services",
+    "outDir": "./dist-server",
+    "rootDir": "./",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "allowJs": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
     "noEmit": false
   },
   "include": [
-    "services/**/*.ts"
+    "services/**/*.ts",
+    "types.ts"
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "dist",
+    "dist-server"
   ]
 }
