@@ -1,42 +1,40 @@
-import { GoogleGenAI } from "@google/genai";
 import { SystemMetrics, KnowledgeDocument } from "../types";
 
 export const analyzeSystemHealth = async (
-  metrics: SystemMetrics, 
+  metrics: SystemMetrics,
   recentDocs: KnowledgeDocument[]
 ): Promise<string> => {
-  if (!process.env.API_KEY) {
-    return "API Key is missing. Please provide a valid Gemini API Key to use the AI Analyst.";
-  }
-
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
-    const prompt = `
-      You are an advanced System Administrator AI for a RAG (Retrieval Augmented Generation) Chatbot system.
-      Analyze the following system snapshot and provide a concise, professional status report.
-      
-      System Metrics:
-      - Health Status: ${metrics.systemHealth}
-      - Total Vectors in DB: ${metrics.totalVectors}
-      - Daily Requests: ${metrics.dailyRequests}
-      - API Latency: ${metrics.apiLatencyMs}ms
-      
-      Recent Knowledge Ingestion Activity:
-      ${recentDocs.map(d => `- ${d.name} (${d.type}): ${d.status}`).join('\n')}
-      
-      Please highlight any potential bottlenecks, suggest optimizations if necessary (e.g. if latency is high), or confirm system stability. 
-      Keep it under 100 words.
-    `;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
+    // Call the backend proxy to keep API key secure
+    const response = await fetch('/api/gemini/analyze', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ metrics, recentDocs })
     });
 
-    return response.text || "Analysis complete, but no text returned.";
-  } catch (error) {
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `API request failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.result;
+  } catch (error: any) {
     console.error("Gemini Analysis Failed:", error);
-    return "Failed to perform AI analysis. Please check console logs.";
+
+    // More specific error handling
+    if (error.message?.includes("401")) {
+      throw new Error("Invalid API Key. Please check your Gemini API credentials.");
+    } else if (error.message?.includes("403")) {
+      throw new Error("Access denied. Please check your API key permissions.");
+    } else if (error.message?.includes("429")) {
+      throw new Error("Rate limit exceeded. Please try again later.");
+    } else if (error.message?.includes("API_KEY")) {
+      throw new Error("API Key configuration error. Please verify your API key is set correctly.");
+    } else {
+      throw new Error(`Failed to perform AI analysis: ${error.message || 'Unknown error'}`);
+    }
   }
 };

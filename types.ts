@@ -54,3 +54,16 @@ export interface SystemMetrics {
   apiLatencyMs: number;
   dailyRequests: number;
 }
+
+export interface Member {
+  id: string;
+  name: string;
+  position: string;
+  role: string;
+  phone: string;
+  email?: string;
+  facebookId?: string; // Facebook ID for direct messaging
+  department?: string;
+  tasks: string[];
+  avatar?: string;
+}

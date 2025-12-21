@@ -21,14 +21,14 @@ const ChatHistoryView: React.FC<ChatHistoryViewProps> = ({ fbConfig }) => {
   useEffect(() => {
     if (isConnected) {
         setIsLoading(true);
+        setError(null);
         fetchFacebookConversations(fbConfig.pageId, fbConfig.accessToken)
             .then(data => {
                 setSessions(data);
-                setError(null);
             })
             .catch(err => {
-                console.error(err);
-                setError("Không thể tải dữ liệu từ Facebook. Vui lòng kiểm tra lại Token.");
+                console.error("Failed to fetch Facebook conversations:", err);
+                setError(err.message || "Không thể tải dữ liệu từ Facebook. Vui lòng kiểm tra lại Token.");
             })
             .finally(() => setIsLoading(false));
     } else {
@@ -61,14 +61,14 @@ const ChatHistoryView: React.FC<ChatHistoryViewProps> = ({ fbConfig }) => {
   const handleRefresh = () => {
     if (isConnected) {
       setIsLoading(true);
+      setError(null);
       fetchFacebookConversations(fbConfig.pageId, fbConfig.accessToken)
         .then(data => {
           setSessions(data);
-          setError(null);
         })
         .catch(err => {
-          console.error(err);
-          setError("Không thể tải dữ liệu từ Facebook. Vui lòng kiểm tra lại Token.");
+          console.error("Failed to refresh Facebook conversations:", err);
+          setError(err.message || "Không thể tải dữ liệu từ Facebook. Vui lòng kiểm tra lại Token.");
         })
         .finally(() => setIsLoading(false));
     }

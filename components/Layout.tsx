@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Database, MessageSquare, Settings, Menu, X, Building2 } from 'lucide-react';
+import { LayoutDashboard, Database, MessageSquare, Settings, Users, X, Building2, Menu } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -14,6 +14,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
     { id: 'dashboard', label: 'Tổng quan Hệ thống', icon: <LayoutDashboard size={20} /> },
     { id: 'knowledge', label: 'Kho Dữ liệu Pháp lý', icon: <Database size={20} /> },
     { id: 'chat', label: 'Lịch sử Tư vấn', icon: <MessageSquare size={20} /> },
+    { id: 'members', label: 'Danh bạ Khu phố', icon: <Users size={20} /> },
     { id: 'settings', label: 'Cấu hình & Kết nối', icon: <Settings size={20} /> },
   ];
 
@@ -29,6 +30,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
         <div
           className="fixed inset-0 bg-black/20 z-20 md:hidden backdrop-blur-sm"
           onClick={() => setIsSidebarOpen(false)}
+          aria-hidden="true"
         />
       )}
 
@@ -37,10 +39,12 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
         className={`fixed md:static inset-y-0 left-0 z-30 w-72 bg-white/90 backdrop-blur-xl border-r border-slate-200 shadow-2xl md:shadow-lg transform transition-transform duration-300 ease-in-out ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
+        role="navigation"
+        aria-label="Menu chính"
       >
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-blue-50 to-white">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-700 flex items-center justify-center shadow-lg shadow-blue-600/20">
+            <div className="w-10 h-10 rounded-xl bg-blue-700 flex items-center justify-center shadow-lg shadow-blue-600/20" aria-hidden="true">
               <Building2 size={20} className="text-white" />
             </div>
             <div>
@@ -52,12 +56,13 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
           <button
             onClick={() => setIsSidebarOpen(false)}
             className="md:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-lg"
+            aria-label="Đóng menu"
           >
-            <X size={20} />
+            <X size={20} aria-hidden="true" />
           </button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto" aria-label="Menu điều hướng">
           {navItems.map((item) => (
             <button
               key={item.id}
@@ -67,8 +72,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
                   : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
               }`}
+              aria-current={activeTab === item.id ? 'page' : undefined}
             >
-              <div className={`${activeTab === item.id ? 'text-white' : 'text-slate-400'}`}>
+              <div className={`${activeTab === item.id ? 'text-white' : 'text-slate-400'}`} aria-hidden="true">
                 {item.icon}
               </div>
               <span>{item.label}</span>
@@ -77,8 +83,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
         </nav>
 
         <div className="p-4 border-t border-slate-100">
-          <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-100">
-            <div className="relative flex h-2.5 w-2.5">
+          <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-100" aria-label="Trạng thái hệ thống">
+            <div className="relative flex h-2.5 w-2.5" aria-hidden="true">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </div>
@@ -102,18 +108,18 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
               className="md:hidden p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
               aria-label="Toggle menu"
             >
-              <Menu size={24} />
+              <Menu size={24} aria-hidden="true" />
             </button>
             <h2 className="text-lg md:text-xl font-bold text-slate-800 uppercase tracking-tight truncate">
-              {navItems.find(n => n.id === activeTab)?.label}
+              {navItems.find(n => n.id === activeTab)?.label || 'Trang không xác định'}
             </h2>
           </div>
           <div className="flex items-center gap-2 md:gap-4">
-             <div className="px-3 py-1.5 bg-white rounded-md text-[11px] font-bold text-slate-600 border border-slate-200 shadow-sm whitespace-nowrap">
+             <div className="px-3 py-1.5 bg-white rounded-md text-[11px] font-bold text-slate-600 border border-slate-200 shadow-sm whitespace-nowrap" aria-label="Khu vực hiện tại">
                Khu vực: <span className="text-blue-700">TP. Hồ Chí Minh</span>
              </div>
              <div className="hidden md:flex items-center gap-2">
-               <div className="relative flex h-2.5 w-2.5">
+               <div className="relative flex h-2.5 w-2.5" aria-label="Trạng thái hệ thống">
                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                </div>

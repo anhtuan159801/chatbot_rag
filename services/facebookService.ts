@@ -8,24 +8,49 @@ const GRAPH_API_URL = 'https://graph.facebook.com/v18.0';
  */
 
 export const fetchFacebookConversations = async (pageId: string, accessToken: string): Promise<ChatSession[]> => {
-  if (!pageId || !accessToken) return [];
+  if (!pageId || !accessToken) {
+    console.error("Missing required parameters for Facebook API: pageId or accessToken");
+    return [];
+  }
 
   try {
     // Gọi API thực tế của Facebook
     // GET /{page-id}/conversations?fields=participants,updated_time,messages.limit(1){message,created_time,from}
     const response = await fetch(
-      `${GRAPH_API_URL}/${pageId}/conversations?fields=participants,updated_time,messages.limit(1){message,created_time,from}&access_token=${accessToken}`
+      `${GRAPH_API_URL}/${pageId}/conversations?fields=participants,updated_time,messages.limit(1){message,created_time,from}&access_token=${accessToken}`,
+      {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      }
     );
 
     if (!response.ok) {
-        // Nếu token không hợp lệ hoặc API lỗi (do môi trường test), ta sẽ trả về lỗi
-        // Trong môi trường Demo này, nếu API fail, tôi sẽ trả về giả lập để bạn thấy UI hoạt động
-        console.warn("Facebook API Error (Demo Mode Active):", await response.text());
-        throw new Error("API_ERROR");
+      const errorText = await response.text();
+      console.error("Facebook API Error:", response.status, errorText);
+
+      // Handle specific error codes
+      if (response.status === 400) {
+        throw new Error("Bad request: Invalid parameters provided to Facebook API");
+      } else if (response.status === 401) {
+        throw new Error("Unauthorized: Invalid access token for Facebook API");
+      } else if (response.status === 403) {
+        throw new Error("Forbidden: Insufficient permissions for Facebook API");
+      } else if (response.status === 429) {
+        throw new Error("Rate limit exceeded: Too many requests to Facebook API");
+      } else {
+        throw new Error(`Facebook API request failed with status ${response.status}`);
+      }
     }
 
     const data = await response.json();
-    
+
+    // Validate response structure
+    if (!data || !data.data || !Array.isArray(data.data)) {
+      throw new Error("Invalid response format from Facebook API");
+    }
+
     // Map dữ liệu từ Facebook JSON sang cấu trúc App
     return data.data.map((conv: any) => ({
       id: conv.id,
@@ -36,7 +61,14 @@ export const fetchFacebookConversations = async (pageId: string, accessToken: st
       status: 'Active' // Mặc định active vì API facebook không trả status đóng/mở
     }));
 
-  } catch (error) {
+  } catch (error: any) {
+    console.error("Facebook API Error:", error);
+
+    // If it's a specific API error, re-throw it to be handled by the UI
+    if (error.message.includes("Facebook API")) {
+      throw error;
+    }
+
     console.log("Using Mock Data fallback for demonstration purposes because invalid Token provided.");
     // FALLBACK DATA: Chỉ dùng khi không có Token thật để demo giao diện
     return [

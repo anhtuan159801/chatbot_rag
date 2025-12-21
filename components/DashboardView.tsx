@@ -39,9 +39,10 @@ const DashboardView: React.FC<DashboardViewProps> = ({ documents }) => {
       setAnalysis(result);
       setLastUpdated(new Date());
       showToast('Phân tích hoàn tất', 'success');
-    } catch (e) {
-      showToast('Lỗi phân tích hệ thống', 'error');
-      console.error('AI Analysis error:', e);
+    } catch (error: any) {
+      const errorMessage = error.message || 'Lỗi phân tích hệ thống';
+      showToast(errorMessage, 'error');
+      console.error('AI Analysis error:', error);
     } finally {
       setIsAnalyzing(false);
     }
@@ -83,7 +84,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ documents }) => {
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold flex items-center gap-2 text-slate-800">
-                  <div className="p-1.5 bg-blue-100 rounded-lg text-blue-700">
+                  <div className="p-1.5 bg-blue-100 rounded-lg text-blue-700" aria-hidden="true">
                     <Sparkles size={20} />
                   </div>
                   Trợ lý Giám sát Hệ thống (Gemini AI)
@@ -92,10 +93,11 @@ const DashboardView: React.FC<DashboardViewProps> = ({ documents }) => {
                   onClick={handleAnalyze}
                   disabled={isAnalyzing}
                   className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white shadow-lg shadow-slate-900/10 rounded-lg text-sm font-medium transition-all disabled:opacity-50 flex items-center gap-2 active:scale-95"
+                  aria-label={isAnalyzing ? "Đang phân tích, vui lòng chờ" : "Phân tích dữ liệu hệ thống"}
                 >
                   {isAnalyzing ? (
                     <>
-                      <RefreshCw size={16} className="animate-spin" />
+                      <RefreshCw size={16} className="animate-spin" aria-hidden="true" />
                       Đang xử lý...
                     </>
                   ) : (
@@ -121,7 +123,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ documents }) => {
           {/* Health Score / Quick Status */}
           <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col justify-between">
              <div className="flex items-center gap-2 mb-2">
-                <div className="p-2 bg-emerald-100 text-emerald-700 rounded-lg">
+                <div className="p-2 bg-emerald-100 text-emerald-700 rounded-lg" aria-hidden="true">
                     <ShieldCheck size={20} />
                 </div>
                 <h3 className="font-bold text-slate-800">Độ ổn định</h3>
@@ -137,14 +139,14 @@ const DashboardView: React.FC<DashboardViewProps> = ({ documents }) => {
                     <span className="text-slate-500">Tài nguyên CPU</span>
                     <span className="text-slate-800">12%</span>
                  </div>
-                 <div className="w-full bg-slate-100 rounded-full h-1.5">
+                 <div className="w-full bg-slate-100 rounded-full h-1.5" role="progressbar" aria-valuenow={12} aria-valuemin={0} aria-valuemax={100} aria-label="Tải CPU">
                     <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: '12%' }}></div>
                  </div>
                  <div className="flex justify-between text-xs font-semibold">
                     <span className="text-slate-500">Bộ nhớ (RAM)</span>
                     <span className="text-slate-800">45%</span>
                  </div>
-                 <div className="w-full bg-slate-100 rounded-full h-1.5">
+                 <div className="w-full bg-slate-100 rounded-full h-1.5" role="progressbar" aria-valuenow={45} aria-valuemin={0} aria-valuemax={100} aria-label="Tải RAM">
                     <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: '45%' }}></div>
                  </div>
              </div>
@@ -153,50 +155,50 @@ const DashboardView: React.FC<DashboardViewProps> = ({ documents }) => {
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow" role="region" aria-labelledby="metric1">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-slate-500 font-semibold text-sm">Văn bản pháp quy</span>
-            <div className="p-2 bg-indigo-100 rounded-lg text-indigo-700">
+            <span id="metric1" className="text-slate-500 font-semibold text-sm">Văn bản pháp quy</span>
+            <div className="p-2 bg-indigo-100 rounded-lg text-indigo-700" aria-hidden="true">
                 <Database size={20} />
             </div>
           </div>
-          <div className="text-3xl font-bold text-slate-900">{totalVectors.toLocaleString()}</div>
+          <div className="text-3xl font-bold text-slate-900" aria-label={`Tổng số văn bản pháp lý: ${totalVectors.toLocaleString()}`}>{totalVectors.toLocaleString()}</div>
           <div className="text-xs font-medium text-emerald-600 mt-2 flex items-center gap-1">
             <span className="bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded text-[10px]">+{recentDocCount}</span>
             <span className="text-slate-400">tài liệu mới</span>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow" role="region" aria-labelledby="metric2">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-slate-500 font-semibold text-sm">Phiên tư vấn</span>
-            <div className="p-2 bg-blue-100 rounded-lg text-blue-700">
+            <span id="metric2" className="text-slate-500 font-semibold text-sm">Phiên tư vấn</span>
+            <div className="p-2 bg-blue-100 rounded-lg text-blue-700" aria-hidden="true">
                 <Users size={20} />
             </div>
           </div>
-          <div className="text-3xl font-bold text-slate-900">{MOCK_METRICS.activeChats}</div>
+          <div className="text-3xl font-bold text-slate-900" aria-label={`Số phiên tư vấn đang hoạt động: ${MOCK_METRICS.activeChats}`}>{MOCK_METRICS.activeChats}</div>
           <div className="text-xs font-medium text-slate-400 mt-2">Đang hoạt động trên Messenger</div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow" role="region" aria-labelledby="metric3">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-slate-500 font-semibold text-sm">Độ trễ phản hồi</span>
-            <div className="p-2 bg-amber-100 rounded-lg text-amber-700">
+            <span id="metric3" className="text-slate-500 font-semibold text-sm">Độ trễ phản hồi</span>
+            <div className="p-2 bg-amber-100 rounded-lg text-amber-700" aria-hidden="true">
                 <Zap size={20} />
             </div>
           </div>
-          <div className="text-3xl font-bold text-slate-900">{MOCK_METRICS.apiLatencyMs}<span className="text-lg text-slate-400 font-medium">ms</span></div>
+          <div className="text-3xl font-bold text-slate-900" aria-label={`Độ trễ phản hồi: ${MOCK_METRICS.apiLatencyMs} mili giây`}>{MOCK_METRICS.apiLatencyMs}<span className="text-lg text-slate-400 font-medium">ms</span></div>
           <div className="text-xs font-medium text-emerald-600 mt-2">Tốc độ tối ưu</div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow" role="region" aria-labelledby="metric4">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-slate-500 font-semibold text-sm">Yêu cầu trong ngày</span>
-            <div className="p-2 bg-teal-100 rounded-lg text-teal-700">
+            <span id="metric4" className="text-slate-500 font-semibold text-sm">Yêu cầu trong ngày</span>
+            <div className="p-2 bg-teal-100 rounded-lg text-teal-700" aria-hidden="true">
                 <Server size={20} />
             </div>
           </div>
-          <div className="text-3xl font-bold text-slate-900">{MOCK_METRICS.dailyRequests.toLocaleString()}</div>
+          <div className="text-3xl font-bold text-slate-900" aria-label={`Số yêu cầu trong ngày: ${MOCK_METRICS.dailyRequests.toLocaleString()}`}>{MOCK_METRICS.dailyRequests.toLocaleString()}</div>
           <div className="text-xs font-medium text-slate-400 mt-2">Cập nhật 1 phút trước</div>
         </div>
       </div>

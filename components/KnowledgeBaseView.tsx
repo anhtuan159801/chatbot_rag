@@ -47,16 +47,23 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ documents, setDoc
         id: Math.random().toString(36).substr(2, 9),
         name: file.name,
         type: file.name.toLowerCase().endsWith('.pdf') ? DocumentType.PDF : DocumentType.DOCX,
-        status: IngestionStatus.PROCESSING,
+        status: IngestionStatus.PENDING,
         uploadDate: new Date().toISOString(),
         vectorCount: 0,
         size: (file.size / 1024 / 1024).toFixed(2) + ' MB'
       }));
 
+      // Add documents immediately with PENDING status
+      setDocuments(prev => [...newDocs, ...prev]);
+
+      // Simulate processing steps
       setTimeout(() => {
-        setDocuments(prev => [...newDocs, ...prev]);
-        setIsUploading(false);
-        showToast('Tải văn bản thành công!', 'success');
+        setDocuments(prev => prev.map(d => {
+          if (newDocs.some(nd => nd.id === d.id)) {
+            return { ...d, status: IngestionStatus.PROCESSING };
+          }
+          return d;
+        }));
 
         // Simulate completion for all uploaded files
         setTimeout(() => {
@@ -66,9 +73,10 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ documents, setDoc
             }
             return d;
           }));
+          setIsUploading(false);
           showToast(`Đã xử lý xong ${files.length} văn bản.`, 'success');
         }, 3000);
-      }, 1500);
+      }, 1000);
     }
   };
 
@@ -102,6 +110,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ documents, setDoc
     // Simulate Crawl Process
     setTimeout(() => {
         setDocuments(prev => prev.map(d => d.id === newDoc.id ? { ...d, status: IngestionStatus.PROCESSING } : d));
+        showToast(`Đang xử lý trang web: ${crawlUrl}`, 'info');
 
         setTimeout(() => {
             setDocuments(prev => prev.map(d => d.id === newDoc.id ? {
