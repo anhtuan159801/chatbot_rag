@@ -84,5 +84,35 @@ export const fetchConversationMessages = async (conversationId: string, accessTo
     // GET /{conversation-id}/messages?fields=message,created_time,from
     // Implementation tương tự fetchConversations
     // Trả về dữ liệu mẫu cho demo
-    return []; 
+    return [];
+};
+
+/**
+ * Gửi tin nhắn phản hồi đến người dùng Facebook
+ */
+export const sendFbMessage = async (psid: string, messageText: string, accessToken: string) => {
+  try {
+    const response = await fetch(
+      `${GRAPH_API_URL}/me/messages?recipient={"id":"${psid}"}&message={"text":"${encodeURIComponent(messageText)}"}&access_token=${accessToken}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
+    );
+
+    const data = await response.json();
+
+    if (response.ok) {
+      console.log('Message sent successfully:', data);
+      return data;
+    } else {
+      console.error('Failed to send message:', data);
+      throw new Error(`Failed to send message: ${data.error?.message || 'Unknown error'}`);
+    }
+  } catch (error) {
+    console.error('Error sending Facebook message:', error);
+    throw error;
+  }
 };

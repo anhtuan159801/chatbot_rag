@@ -63,25 +63,69 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
   const [isTestSending, setIsTestSending] = useState(false);
 
   // --- Handlers ---
-  const handleFbConnect = (e: React.FormEvent) => {
+  const handleFbConnect = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsConnectingFb(true);
-    setTimeout(() => {
-      setIsConnectingFb(false);
-      if (fbConfig.pageId && fbConfig.accessToken) {
+
+    try {
+      // Save the Facebook configuration to the server
+      const response = await fetch('/api/facebook-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          pageId: fbConfig.pageId,
+          accessToken: fbConfig.accessToken,
+          pageName: fbConfig.pageName || 'Cổng Dịch Vụ Công Trực Tuyến'
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
         if (!fbConfig.pageName) setFbConfig(prev => ({ ...prev, pageName: 'Cổng Dịch Vụ Công Trực Tuyến' }));
         showToast('Kết nối Fanpage thành công! Dữ liệu chat sẽ được đồng bộ.', 'success');
         setLastSaved(new Date());
       } else {
-         showToast('Vui lòng kiểm tra lại Page ID và Access Token.', 'error');
+        showToast('Lưu cấu hình Facebook thất bại.', 'error');
       }
-    }, 1500);
+    } catch (error) {
+      console.error('Error saving Facebook config:', error);
+      showToast('Lỗi kết nối máy chủ khi lưu cấu hình.', 'error');
+    } finally {
+      setIsConnectingFb(false);
+    }
   };
 
-  const handleFbDisconnect = () => {
+  const handleFbDisconnect = async () => {
     if (confirm('Ngắt kết nối Fanpage? Dữ liệu lịch sử chat sẽ bị ẩn.')) {
-      setFbConfig({ pageName: '', pageId: '', accessToken: '' });
-      showToast('Đã ngắt kết nối.', 'info');
+      try {
+        // Clear the Facebook configuration from the server
+        const response = await fetch('/api/facebook-config', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            pageId: '',
+            accessToken: '',
+            pageName: ''
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          setFbConfig({ pageName: '', pageId: '', accessToken: '' });
+          showToast('Đã ngắt kết nối.', 'info');
+        } else {
+          showToast('Lỗi khi ngắt kết nối từ máy chủ.', 'error');
+        }
+      } catch (error) {
+        console.error('Error disconnecting Facebook config:', error);
+        showToast('Lỗi kết nối máy chủ khi ngắt kết nối.', 'error');
+      }
     }
   };
 
@@ -215,8 +259,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
             <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Callback URL</label>
                 <div className="flex flex-col md:flex-row gap-2">
-                    <code className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-slate-600 font-mono text-sm break-all">https://amazing-enrika-anhtuan150821-6fb89dc1.koyeb.app/webhooks/facebook</code>
-                    <button onClick={() => copyToClipboard('https://amazing-enrika-anhtuan150821-6fb89dc1.koyeb.app/webhooks/facebook', 'url')} className={`px-4 py-3 md:py-0 border rounded-lg transition-all flex items-center justify-center gap-2 ${copiedField === 'url' ? 'bg-green-50 border-green-200 text-green-600' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-500'}`}>{copiedField === 'url' ? <Check size={18} /> : <Copy size={18} />} <span className="md:hidden">Sao chép</span></button>
+                    <code className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-slate-600 font-mono text-sm break-all">{window.location.origin}/webhooks/facebook</code>
+                    <button onClick={() => copyToClipboard(`${window.location.origin}/webhooks/facebook`, 'url')} className={`px-4 py-3 md:py-0 border rounded-lg transition-all flex items-center justify-center gap-2 ${copiedField === 'url' ? 'bg-green-50 border-green-200 text-green-600' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-500'}`}>{copiedField === 'url' ? <Check size={18} /> : <Copy size={18} />} <span className="md:hidden">Sao chép</span></button>
                 </div>
             </div>
             <div className="space-y-2">

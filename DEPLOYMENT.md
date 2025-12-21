@@ -130,8 +130,9 @@ After deployment, configure your Facebook integration:
 1. Go to your deployed application's Settings page
 2. Enter your Facebook Page ID and Access Token
 3. Configure the webhook URL in your Facebook App Dashboard:
-   - Callback URL: `https://YOUR_APP_URL/webhooks/facebook`
-   - Verify Token: `dvc_verify_token_2024_secure` (or your custom token)
+   - Callback URL: Navigate to the Settings page of your admin console, and copy the Callback URL shown in the Webhook Configuration section
+   - Verify Token: `dvc_verify_token_2024_secure` (or set your own FB_VERIFY_TOKEN environment variable)
+   - Subscription Fields: `messages`, `messaging_postbacks`, `messaging_optins`
 
 ### SSL/HTTPS
 All platforms will automatically provide SSL certificates for HTTPS access.
