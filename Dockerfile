@@ -14,8 +14,8 @@ COPY . .
 # Install TypeScript for compilation
 RUN npm install -g typescript
 
-# Compile all server-side TypeScript files to JavaScript
-RUN npx tsc --project tsconfig.server.json
+# Compile all server-side TypeScript files to JavaScript in place
+RUN npx tsc services/apiProxy.ts --outDir services --module ES2020 --target ES2020 --moduleResolution node
 
 # Build the frontend
 RUN npm run build
