@@ -78,6 +78,7 @@ config/secrets.yml
 # TypeScript
 *.tsbuildinfo
 dist/
+dist-server/
 out/
 
 # Vite

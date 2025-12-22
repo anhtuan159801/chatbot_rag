@@ -2,6 +2,15 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import apiProxy from './services/apiProxy.js'; // Import the API proxy
+import {
+  getConfig,
+  updateConfig,
+  getModels,
+  updateModels,
+  getAiRoles,
+  updateAiRoles,
+  initializeSystemData
+} from './services/supabaseService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -9,33 +18,14 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// In-memory storage for Facebook configuration
-// Note: In a production environment, this should be stored in a persistent database
-let fbConfig = {
-  pageId: process.env.FACEBOOK_PAGE_ID || '',
-  accessToken: process.env.FACEBOOK_ACCESS_TOKEN || '',
-  pageName: process.env.FACEBOOK_PAGE_NAME || ''
-};
+// Facebook configuration will be loaded from Supabase
+let fbConfig: { pageId: string; accessToken: string; pageName: string } | null = null;
 
-// In-memory storage for AI model configurations
-// Note: In a production environment, this should be stored in a persistent database
-let modelConfigs = [
-  { id: 'gemini-1', provider: 'gemini', name: 'Google Gemini', modelString: 'gemini-3-flash-preview', apiKey: process.env.GEMINI_API_KEY || '', isActive: true },
-  { id: 'openai-1', provider: 'openai', name: 'OpenAI', modelString: 'gpt-4o', apiKey: process.env.OPENAI_API_KEY || '', isActive: false },
-  { id: 'openrouter-1', provider: 'openrouter', name: 'OpenRouter', modelString: 'openai/whisper-large-v3', apiKey: process.env.OPENROUTER_API_KEY || '', isActive: false },
-  { id: 'hf-1', provider: 'huggingface', name: 'Hugging Face', modelString: 'xiaomi/mimo-v2-flash:free', apiKey: process.env.HUGGINGFACE_API_KEY || '', isActive: false },
-];
+// AI model configurations will be loaded from Supabase
+let modelConfigs: any[] = [];
 
-// In-memory storage for AI role assignments
-let aiRoles = {
-  chatbotText: 'gemini-1',
-  chatbotVision: 'gemini-1',
-  chatbotAudio: 'gemini-1',
-  rag: 'openai-1',
-  analysis: 'gemini-1',
-  sentiment: 'hf-1',
-  systemPrompt: 'Bạn là Trợ lý ảo Hỗ trợ Thủ tục Hành chính công. Nhiệm vụ của bạn là hướng dẫn công dân chuẩn bị hồ sơ, giải đáp thắc mắc về quy trình, lệ phí và thời gian giải quyết một cách chính xác, lịch sự và căn cứ theo văn bản pháp luật hiện hành. Tuyệt đối không tư vấn các nội dung trái pháp luật.'
-};
+// AI role assignments will be loaded from Supabase
+let aiRoles: Record<string, string> = {};
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));
@@ -62,70 +52,175 @@ app.use((req, res, next) => {
 app.use('/api', apiProxy);
 
 // Endpoint to get Facebook configuration (without sensitive data like access token)
-app.get('/api/facebook-config', (req, res) => {
-  // Return all config except the access token for security
-  const { pageId, pageName } = fbConfig;
-  res.json({ pageId, pageName });
+app.get('/api/facebook-config', async (req, res) => {
+  try {
+    // Load Facebook config from Supabase
+    const config = await getConfig('facebook_config');
+
+    if (config) {
+      // Return all config except the access token for security
+      const { pageId, pageName } = config;
+      res.json({ pageId, pageName });
+    } else {
+      // Return empty config if not found
+      res.json({ pageId: '', pageName: '' });
+    }
+  } catch (error) {
+    console.error('Error getting Facebook config:', error);
+    res.status(500).json({ error: 'Failed to retrieve Facebook configuration' });
+  }
 });
 
 // Endpoint to update Facebook configuration
-app.post('/api/facebook-config', (req, res) => {
-  const { pageId, accessToken, pageName } = req.body;
-  
-  if (pageId !== undefined) fbConfig.pageId = pageId;
-  if (accessToken !== undefined) fbConfig.accessToken = accessToken;  // In production, validate and hash this
-  if (pageName !== undefined) fbConfig.pageName = pageName;
-  
-  res.json({ success: true, message: 'Facebook configuration updated successfully' });
+app.post('/api/facebook-config', async (req, res) => {
+  try {
+    const { pageId, accessToken, pageName } = req.body;
+
+    // Update Facebook config in Supabase
+    const updatedConfig = {
+      pageId: pageId !== undefined ? pageId : fbConfig?.pageId || '',
+      accessToken: accessToken !== undefined ? accessToken : fbConfig?.accessToken || '',
+      pageName: pageName !== undefined ? pageName : fbConfig?.pageName || ''
+    };
+
+    const success = await updateConfig('facebook_config', updatedConfig);
+
+    if (success) {
+      // Update the in-memory cache
+      fbConfig = updatedConfig;
+      res.json({ success: true, message: 'Facebook configuration updated successfully' });
+    } else {
+      res.status(500).json({ error: 'Failed to update Facebook configuration' });
+    }
+  } catch (error) {
+    console.error('Error updating Facebook config:', error);
+    res.status(500).json({ error: 'Failed to update Facebook configuration' });
+  }
 });
 
 // Endpoint to get AI model configurations (without API keys for security)
-app.get('/api/models', (req, res) => {
-  // Return model configurations without the API keys for security
-  const modelsWithoutKeys = modelConfigs.map(model => ({
-    ...model,
-    apiKey: ''  // Don't send the API key to the client
-  }));
-  res.json(modelsWithoutKeys);
+app.get('/api/models', async (req, res) => {
+  try {
+    // Load models from Supabase
+    const models = await getModels();
+
+    // Return model configurations without the API keys for security
+    const modelsWithoutKeys = models.map(model => ({
+      ...model,
+      apiKey: '',  // Don't send the API key to the client
+      modelString: model.model_string,  // Map the field name to match frontend expectations
+      isActive: model.is_active
+    }));
+
+    res.json(modelsWithoutKeys);
+  } catch (error) {
+    console.error('Error getting AI models:', error);
+    res.status(500).json({ error: 'Failed to retrieve AI models' });
+  }
 });
 
 // Endpoint to update AI model configurations
-app.post('/api/models', (req, res) => {
-  const updatedModels = req.body;
-  
-  // Update the model configurations
-  modelConfigs = updatedModels.map((model: any) => {
-    // Find the existing model to get the API key if it exists
-    const existingModel = modelConfigs.find((m: any) => m.id === model.id);
-    const apiKey = model.apiKey || (existingModel ? existingModel.apiKey : '');
+app.post('/api/models', async (req, res) => {
+  try {
+    const updatedModels = req.body;
 
-    return {
-      ...model,
-      apiKey: apiKey  // Preserve the API key if it was already set and not provided in the request
-    };
-  });
-  
-  res.json({ success: true, message: 'Model configurations updated successfully' });
+    // Prepare models for database storage
+    const modelsForDb = updatedModels.map((model: any) => {
+      return {
+        id: model.id,
+        provider: model.provider,
+        name: model.name,
+        model_string: model.modelString,
+        api_key: model.apiKey,  // This would come from a secure source in production
+        is_active: model.isActive
+      };
+    });
+
+    const success = await updateModels(modelsForDb);
+
+    if (success) {
+      // Update the in-memory cache
+      modelConfigs = updatedModels;
+      res.json({ success: true, message: 'Model configurations updated successfully' });
+    } else {
+      res.status(500).json({ error: 'Failed to update model configurations' });
+    }
+  } catch (error) {
+    console.error('Error updating AI models:', error);
+    res.status(500).json({ error: 'Failed to update model configurations' });
+  }
 });
 
 // Endpoint to get AI role assignments and system prompt
-app.get('/api/roles', (req, res) => {
-  res.json(aiRoles);
+app.get('/api/roles', async (req, res) => {
+  try {
+    // Load AI roles from Supabase
+    const roles = await getAiRoles();
+
+    // Also get the system prompt from Supabase
+    const systemPrompt = await getConfig('system_prompt');
+
+    // Combine roles with system prompt
+    const result = {
+      ...roles,
+      systemPrompt: systemPrompt || 'Bạn là Trợ lý ảo Hỗ trợ Thủ tục Hành chính công. Nhiệm vụ của bạn là hướng dẫn công dân chuẩn bị hồ sơ, giải đáp thắc mắc về quy trình, lệ phí và thời gian giải quyết một cách chính xác, lịch sự và căn cứ theo văn bản pháp luật hiện hành. Tuyệt đối không tư vấn các nội dung trái pháp luật.'
+    };
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error getting AI roles:', error);
+    res.status(500).json({ error: 'Failed to retrieve AI roles' });
+  }
 });
 
 // Endpoint to update AI role assignments and system prompt
-app.post('/api/roles', (req, res) => {
-  const { chatbotText, chatbotVision, chatbotAudio, rag, analysis, sentiment, systemPrompt } = req.body;
-  
-  if (chatbotText !== undefined) aiRoles.chatbotText = chatbotText;
-  if (chatbotVision !== undefined) aiRoles.chatbotVision = chatbotVision;
-  if (chatbotAudio !== undefined) aiRoles.chatbotAudio = chatbotAudio;
-  if (rag !== undefined) aiRoles.rag = rag;
-  if (analysis !== undefined) aiRoles.analysis = analysis;
-  if (sentiment !== undefined) aiRoles.sentiment = sentiment;
-  if (systemPrompt !== undefined) aiRoles.systemPrompt = systemPrompt;
-  
-  res.json({ success: true, message: 'AI roles and system prompt updated successfully' });
+app.post('/api/roles', async (req, res) => {
+  try {
+    const { chatbotText, chatbotVision, chatbotAudio, rag, analysis, sentiment, systemPrompt } = req.body;
+
+    // Update AI roles in Supabase
+    const rolesToUpdate: Record<string, string> = {};
+    if (chatbotText !== undefined) rolesToUpdate.chatbotText = chatbotText;
+    if (chatbotVision !== undefined) rolesToUpdate.chatbotVision = chatbotVision;
+    if (chatbotAudio !== undefined) rolesToUpdate.chatbotAudio = chatbotAudio;
+    if (rag !== undefined) rolesToUpdate.rag = rag;
+    if (analysis !== undefined) rolesToUpdate.analysis = analysis;
+    if (sentiment !== undefined) rolesToUpdate.sentiment = sentiment;
+
+    // Update roles if any need updating
+    if (Object.keys(rolesToUpdate).length > 0) {
+      // Get existing roles and update with new values
+      const existingRoles = await getAiRoles();
+      const updatedRoles = { ...existingRoles, ...rolesToUpdate };
+
+      const rolesSuccess = await updateAiRoles(updatedRoles);
+      if (!rolesSuccess) {
+        res.status(500).json({ error: 'Failed to update AI roles' });
+        return;
+      }
+    }
+
+    // Update system prompt if provided
+    if (systemPrompt !== undefined) {
+      const promptSuccess = await updateConfig('system_prompt', systemPrompt);
+      if (!promptSuccess) {
+        res.status(500).json({ error: 'Failed to update system prompt' });
+        return;
+      }
+    }
+
+    // Update the in-memory cache
+    aiRoles = await getAiRoles();
+    const updatedSystemPrompt = await getConfig('system_prompt');
+    if (updatedSystemPrompt) {
+      aiRoles.systemPrompt = updatedSystemPrompt;
+    }
+
+    res.json({ success: true, message: 'AI roles and system prompt updated successfully' });
+  } catch (error) {
+    console.error('Error updating AI roles:', error);
+    res.status(500).json({ error: 'Failed to update AI roles and system prompt' });
+  }
 });
 
 // Facebook Webhook Verification Endpoint
@@ -193,10 +288,11 @@ app.post('/webhooks/facebook', express.raw({ type: 'application/json' }), async 
           // In a real implementation, you would call your AI service here
           // For now, let's create a simple response
           const response_text = `Cảm ơn bạn đã gửi tin nhắn: "${message_text}". Đây là phản hồi từ hệ thống chatbot.`;
-          
-          // Use the stored Facebook configuration
-          const pageAccessToken = fbConfig.accessToken;
-          
+
+          // Use the stored Facebook configuration from Supabase
+          const config = await getConfig('facebook_config');
+          const pageAccessToken = config?.accessToken;
+
           if (pageAccessToken) {
             // Import the function to send message back to Facebook
             const { sendFbMessage } = await import('./services/facebookService.js');
@@ -242,6 +338,31 @@ app.use(express.static(distPath));
 app.get('*', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
+
+// Initialize system data from Supabase on startup
+const initializeSystem = async () => {
+  try {
+    await initializeSystemData();
+
+    // Load initial configurations into memory
+    fbConfig = await getConfig('facebook_config');
+    modelConfigs = await getModels();
+    aiRoles = await getAiRoles();
+
+    // Add system prompt to aiRoles
+    const systemPrompt = await getConfig('system_prompt');
+    if (systemPrompt) {
+      aiRoles.systemPrompt = systemPrompt;
+    }
+
+    console.log('System configurations loaded from Supabase');
+  } catch (error) {
+    console.error('Error initializing system data:', error);
+  }
+};
+
+// Initialize system data when server starts
+initializeSystem();
 
 // Keep-alive mechanism to prevent sleep on deployment platforms
 setInterval(() => {
