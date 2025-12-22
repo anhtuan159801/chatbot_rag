@@ -1,20 +1,29 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { Client } from 'pg';
 
-// Initialize Supabase client
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Initialize PostgreSQL client using connection string
+const connectionString = process.env.SUPABASE_URL;
 
-if (!supabaseUrl || !supabaseServiceRoleKey) {
-  console.warn('Supabase configuration is missing. Some features may not work properly.');
-  console.warn('Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.');
+if (!connectionString) {
+  console.warn('PostgreSQL connection string is missing. Some features may not work properly.');
+  console.warn('Please set SUPABASE_URL environment variable.');
 }
 
-let supabase: SupabaseClient | null = null;
+let pgClient: Client | null = null;
 
-if (supabaseUrl && supabaseServiceRoleKey) {
-  supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+if (connectionString && connectionString !== 'postgresql://postgres.smtqevkyhttclmpwsmvc:[YOUR-PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres') {
+  pgClient = new Client({
+    connectionString: connectionString,
+  });
+
+  pgClient.connect()
+    .then(() => {
+      console.log('Connected to PostgreSQL database');
+    })
+    .catch(err => {
+      console.error('Error connecting to PostgreSQL database:', err);
+    });
 } else {
-  console.warn('Supabase client not initialized due to missing environment variables.');
+  console.warn('PostgreSQL client not initialized due to missing or default environment variables.');
 }
 
 // Define types for our data structures
@@ -53,24 +62,22 @@ export interface AiRoleAssignment {
  * Get a system configuration value by key
  */
 export const getConfig = async (key: string): Promise<any | null> => {
-  if (!supabase) {
-    console.error('Supabase client not initialized');
+  if (!pgClient) {
+    console.error('PostgreSQL client not initialized');
     return null;
   }
 
   try {
-    const { data, error } = await supabase
-      .from('system_configs')
-      .select('value')
-      .eq('key', key)
-      .single();
+    const result = await pgClient.query(
+      'SELECT value FROM system_configs WHERE key = $1',
+      [key]
+    );
 
-    if (error) {
-      console.error(`Error getting config for key '${key}':`, error);
+    if (result.rows.length > 0) {
+      return result.rows[0].value;
+    } else {
       return null;
     }
-
-    return data?.value || null;
   } catch (error) {
     console.error(`Error getting config for key '${key}':`, error);
     return null;
@@ -81,36 +88,31 @@ export const getConfig = async (key: string): Promise<any | null> => {
  * Update a system configuration value by key
  */
 export const updateConfig = async (key: string, value: any): Promise<boolean> => {
-  if (!supabase) {
-    console.error('Supabase client not initialized');
+  if (!pgClient) {
+    console.error('PostgreSQL client not initialized');
     return false;
   }
 
   try {
     // Check if the config key exists
-    const { data: existing } = await supabase
-      .from('system_configs')
-      .select('key')
-      .eq('key', key)
-      .single();
+    const checkResult = await pgClient.query(
+      'SELECT key FROM system_configs WHERE key = $1',
+      [key]
+    );
 
     let result;
-    if (existing) {
+    if (checkResult.rows.length > 0) {
       // Update existing record
-      result = await supabase
-        .from('system_configs')
-        .update({ value, updated_at: new Date().toISOString() })
-        .eq('key', key);
+      result = await pgClient.query(
+        'UPDATE system_configs SET value = $1, updated_at = $2 WHERE key = $3',
+        [value, new Date().toISOString(), key]
+      );
     } else {
       // Insert new record
-      result = await supabase
-        .from('system_configs')
-        .insert([{ key, value, updated_at: new Date().toISOString() }]);
-    }
-
-    if (result.error) {
-      console.error(`Error updating config for key '${key}':`, result.error);
-      return false;
+      result = await pgClient.query(
+        'INSERT INTO system_configs (key, value, updated_at) VALUES ($1, $2, $3)',
+        [key, value, new Date().toISOString()]
+      );
     }
 
     return true;
@@ -124,23 +126,17 @@ export const updateConfig = async (key: string, value: any): Promise<boolean> =>
  * Get all AI models from the database
  */
 export const getModels = async (): Promise<AiModel[]> => {
-  if (!supabase) {
-    console.error('Supabase client not initialized');
+  if (!pgClient) {
+    console.error('PostgreSQL client not initialized');
     return [];
   }
 
   try {
-    const { data, error } = await supabase
-      .from('ai_models')
-      .select('*')
-      .order('name', { ascending: true });
+    const result = await pgClient.query(
+      'SELECT id, provider, name, model_string, api_key, is_active FROM ai_models ORDER BY name ASC'
+    );
 
-    if (error) {
-      console.error('Error getting AI models:', error);
-      return [];
-    }
-
-    return data || [];
+    return result.rows;
   } catch (error) {
     console.error('Error getting AI models:', error);
     return [];
@@ -151,33 +147,39 @@ export const getModels = async (): Promise<AiModel[]> => {
  * Update AI models in the database
  */
 export const updateModels = async (models: AiModel[]): Promise<boolean> => {
-  if (!supabase) {
-    console.error('Supabase client not initialized');
+  if (!pgClient) {
+    console.error('PostgreSQL client not initialized');
     return false;
   }
 
   try {
+    // Begin transaction
+    await pgClient.query('BEGIN');
+
     // First, delete all existing models
-    const deleteResult = await supabase.from('ai_models').delete().match({});
-    
-    if (deleteResult.error) {
-      console.error('Error deleting existing AI models:', deleteResult.error);
-      return false;
-    }
+    await pgClient.query('DELETE FROM ai_models');
 
     // Then insert the new models
     if (models.length > 0) {
-      const insertResult = await supabase.from('ai_models').insert(models);
-      
-      if (insertResult.error) {
-        console.error('Error inserting AI models:', insertResult.error);
-        return false;
+      for (const model of models) {
+        await pgClient.query(
+          'INSERT INTO ai_models (id, provider, name, model_string, api_key, is_active) VALUES ($1, $2, $3, $4, $5, $6)',
+          [model.id, model.provider, model.name, model.model_string, model.api_key, model.is_active]
+        );
       }
     }
+
+    // Commit transaction
+    await pgClient.query('COMMIT');
 
     return true;
   } catch (error) {
     console.error('Error updating AI models:', error);
+    try {
+      await pgClient.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error('Error rolling back transaction:', rollbackError);
+    }
     return false;
   }
 };
@@ -186,24 +188,19 @@ export const updateModels = async (models: AiModel[]): Promise<boolean> => {
  * Get all AI role assignments
  */
 export const getAiRoles = async (): Promise<Record<string, string>> => {
-  if (!supabase) {
-    console.error('Supabase client not initialized');
+  if (!pgClient) {
+    console.error('PostgreSQL client not initialized');
     return {};
   }
 
   try {
-    const { data, error } = await supabase
-      .from('ai_role_assignments')
-      .select('role_key, model_id');
-
-    if (error) {
-      console.error('Error getting AI role assignments:', error);
-      return {};
-    }
+    const result = await pgClient.query(
+      'SELECT role_key, model_id FROM ai_role_assignments'
+    );
 
     // Convert array of objects to a dictionary
     const roles: Record<string, string> = {};
-    data?.forEach(item => {
+    result.rows.forEach(item => {
       roles[item.role_key] = item.model_id;
     });
 
@@ -218,38 +215,40 @@ export const getAiRoles = async (): Promise<Record<string, string>> => {
  * Update AI role assignments
  */
 export const updateAiRoles = async (roles: Record<string, string>): Promise<boolean> => {
-  if (!supabase) {
-    console.error('Supabase client not initialized');
+  if (!pgClient) {
+    console.error('PostgreSQL client not initialized');
     return false;
   }
 
   try {
+    // Begin transaction
+    await pgClient.query('BEGIN');
+
     // First, delete all existing role assignments
-    const deleteResult = await supabase.from('ai_role_assignments').delete().match({});
-    
-    if (deleteResult.error) {
-      console.error('Error deleting existing AI role assignments:', deleteResult.error);
-      return false;
-    }
+    await pgClient.query('DELETE FROM ai_role_assignments');
 
     // Then insert the new role assignments
-    const roleEntries = Object.entries(roles).map(([roleKey, modelId]) => ({
-      role_key: roleKey,
-      model_id: modelId
-    }));
-
+    const roleEntries = Object.entries(roles);
     if (roleEntries.length > 0) {
-      const insertResult = await supabase.from('ai_role_assignments').insert(roleEntries);
-      
-      if (insertResult.error) {
-        console.error('Error inserting AI role assignments:', insertResult.error);
-        return false;
+      for (const [roleKey, modelId] of roleEntries) {
+        await pgClient.query(
+          'INSERT INTO ai_role_assignments (role_key, model_id) VALUES ($1, $2)',
+          [roleKey, modelId]
+        );
       }
     }
+
+    // Commit transaction
+    await pgClient.query('COMMIT');
 
     return true;
   } catch (error) {
     console.error('Error updating AI role assignments:', error);
+    try {
+      await pgClient.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error('Error rolling back transaction:', rollbackError);
+    }
     return false;
   }
 };
@@ -258,16 +257,19 @@ export const updateAiRoles = async (roles: Record<string, string>): Promise<bool
  * Initialize default system configurations if they don't exist
  */
 export const initializeSystemConfigs = async (): Promise<void> => {
-  if (!supabase) {
-    console.error('Supabase client not initialized');
+  if (!pgClient) {
+    console.error('PostgreSQL client not initialized');
     return;
   }
 
   try {
     // Check if configs already exist
-    const { count } = await supabase.from('system_configs').select('*', { count: 'exact' });
+    const result = await pgClient.query(
+      'SELECT COUNT(*) FROM system_configs'
+    );
     
-    if (count && count > 0) {
+    const count = parseInt(result.rows[0].count);
+    if (count > 0) {
       // Configs already exist, no need to initialize
       return;
     }
@@ -290,13 +292,14 @@ export const initializeSystemConfigs = async (): Promise<void> => {
       }
     ];
 
-    const { error } = await supabase.from('system_configs').insert(defaultConfigs);
-    
-    if (error) {
-      console.error('Error initializing system configs:', error);
-    } else {
-      console.log('Initialized default system configurations');
+    for (const config of defaultConfigs) {
+      await pgClient.query(
+        'INSERT INTO system_configs (key, value, updated_at) VALUES ($1, $2, $3)',
+        [config.key, config.value, config.updated_at]
+      );
     }
+    
+    console.log('Initialized default system configurations');
   } catch (error) {
     console.error('Error initializing system configs:', error);
   }
@@ -306,16 +309,19 @@ export const initializeSystemConfigs = async (): Promise<void> => {
  * Initialize default AI models if they don't exist
  */
 export const initializeAiModels = async (): Promise<void> => {
-  if (!supabase) {
-    console.error('Supabase client not initialized');
+  if (!pgClient) {
+    console.error('PostgreSQL client not initialized');
     return;
   }
 
   try {
     // Check if models already exist
-    const { count } = await supabase.from('ai_models').select('*', { count: 'exact' });
+    const result = await pgClient.query(
+      'SELECT COUNT(*) FROM ai_models'
+    );
     
-    if (count && count > 0) {
+    const count = parseInt(result.rows[0].count);
+    if (count > 0) {
       // Models already exist, no need to initialize
       return;
     }
@@ -356,13 +362,14 @@ export const initializeAiModels = async (): Promise<void> => {
       }
     ];
 
-    const { error } = await supabase.from('ai_models').insert(defaultModels);
-    
-    if (error) {
-      console.error('Error initializing AI models:', error);
-    } else {
-      console.log('Initialized default AI models');
+    for (const model of defaultModels) {
+      await pgClient.query(
+        'INSERT INTO ai_models (id, provider, name, model_string, api_key, is_active) VALUES ($1, $2, $3, $4, $5, $6)',
+        [model.id, model.provider, model.name, model.model_string, model.api_key, model.is_active]
+      );
     }
+    
+    console.log('Initialized default AI models');
   } catch (error) {
     console.error('Error initializing AI models:', error);
   }
@@ -372,16 +379,19 @@ export const initializeAiModels = async (): Promise<void> => {
  * Initialize default AI role assignments if they don't exist
  */
 export const initializeAiRoleAssignments = async (): Promise<void> => {
-  if (!supabase) {
-    console.error('Supabase client not initialized');
+  if (!pgClient) {
+    console.error('PostgreSQL client not initialized');
     return;
   }
 
   try {
     // Check if role assignments already exist
-    const { count } = await supabase.from('ai_role_assignments').select('*', { count: 'exact' });
+    const result = await pgClient.query(
+      'SELECT COUNT(*) FROM ai_role_assignments'
+    );
     
-    if (count && count > 0) {
+    const count = parseInt(result.rows[0].count);
+    if (count > 0) {
       // Role assignments already exist, no need to initialize
       return;
     }
@@ -396,13 +406,14 @@ export const initializeAiRoleAssignments = async (): Promise<void> => {
       { role_key: 'sentiment', model_id: 'hf-1' }
     ];
 
-    const { error } = await supabase.from('ai_role_assignments').insert(defaultRoleAssignments);
-    
-    if (error) {
-      console.error('Error initializing AI role assignments:', error);
-    } else {
-      console.log('Initialized default AI role assignments');
+    for (const assignment of defaultRoleAssignments) {
+      await pgClient.query(
+        'INSERT INTO ai_role_assignments (role_key, model_id) VALUES ($1, $2)',
+        [assignment.role_key, assignment.model_id]
+      );
     }
+    
+    console.log('Initialized default AI role assignments');
   } catch (error) {
     console.error('Error initializing AI role assignments:', error);
   }
@@ -417,4 +428,4 @@ export const initializeSystemData = async (): Promise<void> => {
   await initializeAiRoleAssignments();
 };
 
-export default supabase;
+export default pgClient;
