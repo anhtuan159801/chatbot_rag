@@ -233,11 +233,14 @@ app.get('/ping', (req, res) => {
 });
 
 // Serve static files from the 'dist' directory
-app.use(express.static(path.join(__dirname, 'dist')));
+// __dirname is now pointing to /app/dist-server/ when running node dist-server/server.js
+// So we need to go up one level to find the 'dist' (frontend) directory
+const distPath = path.join(__dirname, '..', 'dist');
+app.use(express.static(distPath));
 
 // For any route that doesn't match a static file, serve the index.html
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+  res.sendFile(path.join(distPath, 'index.html'));
 });
 
 // Keep-alive mechanism to prevent sleep on deployment platforms

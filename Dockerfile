@@ -5,24 +5,17 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
-
-# Install TypeScript and type definitions for compilation
-RUN npm install -g typescript
-RUN npm install --save-dev @types/express
+# Install all dependencies (both production and development)
+RUN npm ci
 
 # Copy source code
 COPY . .
 
-# Compile all server-side TypeScript files to JavaScript
-RUN npx tsc --project tsconfig.server.json
-
-# Copy compiled server files to the correct location
-RUN cp -r dist-server/services/* services/ && rm -rf dist-server
-
-# Build the frontend
+# Build the frontend first (creates dist folder)
 RUN npm run build
+
+# Compile server-side TypeScript files to JavaScript (creates dist-server folder)
+RUN npx tsc --project tsconfig.server.json
 
 # Expose the port
 EXPOSE 8080
