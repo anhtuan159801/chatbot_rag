@@ -106,9 +106,11 @@ app.get('/api/models', async (req, res) => {
 
     // Return model configurations without the API keys for security
     const modelsWithoutKeys = models.map(model => ({
-      ...model,
-      apiKey: '',  // Don't send the API key to the client
+      id: model.id,
+      provider: model.provider,
+      name: model.name,
       modelString: model.model_string,  // Map the field name to match frontend expectations
+      apiKey: '',  // Don't send the API key to the client (security)
       isActive: model.is_active
     }));
 
@@ -160,9 +162,14 @@ app.get('/api/roles', async (req, res) => {
     // Also get the system prompt from Supabase
     const systemPrompt = await getConfig('system_prompt');
 
-    // Combine roles with system prompt
+    // Combine roles with system prompt, ensuring all expected fields are present
     const result = {
-      ...roles,
+      chatbotText: roles.chatbotText || 'gemini-1',
+      chatbotVision: roles.chatbotVision || 'gemini-1',
+      chatbotAudio: roles.chatbotAudio || 'gemini-1',
+      rag: roles.rag || 'openai-1',
+      analysis: roles.analysis || 'gemini-1',
+      sentiment: roles.sentiment || 'hf-1',
       systemPrompt: systemPrompt || 'Bạn là Trợ lý ảo Hỗ trợ Thủ tục Hành chính công. Nhiệm vụ của bạn là hướng dẫn công dân chuẩn bị hồ sơ, giải đáp thắc mắc về quy trình, lệ phí và thời gian giải quyết một cách chính xác, lịch sự và căn cứ theo văn bản pháp luật hiện hành. Tuyệt đối không tư vấn các nội dung trái pháp luật.'
     };
 
@@ -361,16 +368,19 @@ const initializeSystem = async () => {
   }
 };
 
-// Initialize system data when server starts
-initializeSystem();
+// Initialize system data when server starts and then start listening
+initializeSystem().then(() => {
+  // Keep-alive mechanism to prevent sleep on deployment platforms
+  setInterval(() => {
+    console.log('Keep-alive ping:', new Date().toISOString());
+  }, 300000); // Every 5 minutes
 
-// Keep-alive mechanism to prevent sleep on deployment platforms
-setInterval(() => {
-  console.log('Keep-alive ping:', new Date().toISOString());
-}, 300000); // Every 5 minutes
-
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`Health check endpoint available at http://localhost:${PORT}/health`);
-  console.log(`Ping endpoint available at http://localhost:${PORT}/ping`);
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+    console.log(`Health check endpoint available at http://localhost:${PORT}/health`);
+    console.log(`Ping endpoint available at http://localhost:${PORT}/ping`);
+  });
+}).catch(error => {
+  console.error('Failed to initialize system:', error);
+  process.exit(1); // Exit if initialization fails
 });
