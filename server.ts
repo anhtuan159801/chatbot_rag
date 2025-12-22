@@ -22,8 +22,8 @@ let fbConfig = {
 let modelConfigs = [
   { id: 'gemini-1', provider: 'gemini', name: 'Google Gemini', modelString: 'gemini-3-flash-preview', apiKey: process.env.GEMINI_API_KEY || '', isActive: true },
   { id: 'openai-1', provider: 'openai', name: 'OpenAI', modelString: 'gpt-4o', apiKey: process.env.OPENAI_API_KEY || '', isActive: false },
-  { id: 'openrouter-1', provider: 'openrouter', name: 'OpenRouter', modelString: 'mistral-large', apiKey: process.env.OPENROUTER_API_KEY || '', isActive: false },
-  { id: 'hf-1', provider: 'huggingface', name: 'Hugging Face', modelString: 'bert-base-uncased', apiKey: process.env.HUGGINGFACE_API_KEY || '', isActive: false },
+  { id: 'openrouter-1', provider: 'openrouter', name: 'OpenRouter', modelString: 'openai/whisper-large-v3', apiKey: process.env.OPENROUTER_API_KEY || '', isActive: false },
+  { id: 'hf-1', provider: 'huggingface', name: 'Hugging Face', modelString: 'xiaomi/mimo-v2-flash:free', apiKey: process.env.HUGGINGFACE_API_KEY || '', isActive: false },
 ];
 
 // In-memory storage for AI role assignments
@@ -71,11 +71,11 @@ app.get('/api/facebook-config', (req, res) => {
 // Endpoint to update Facebook configuration
 app.post('/api/facebook-config', (req, res) => {
   const { pageId, accessToken, pageName } = req.body;
-
+  
   if (pageId !== undefined) fbConfig.pageId = pageId;
   if (accessToken !== undefined) fbConfig.accessToken = accessToken;  // In production, validate and hash this
   if (pageName !== undefined) fbConfig.pageName = pageName;
-
+  
   res.json({ success: true, message: 'Facebook configuration updated successfully' });
 });
 
@@ -92,11 +92,11 @@ app.get('/api/models', (req, res) => {
 // Endpoint to update AI model configurations
 app.post('/api/models', (req, res) => {
   const updatedModels = req.body;
-
+  
   // Update the model configurations
-  modelConfigs = updatedModels.map(model => {
+  modelConfigs = updatedModels.map((model: any) => {
     // Find the existing model to get the API key if it exists
-    const existingModel = modelConfigs.find(m => m.id === model.id);
+    const existingModel = modelConfigs.find((m: any) => m.id === model.id);
     const apiKey = model.apiKey || (existingModel ? existingModel.apiKey : '');
 
     return {
@@ -104,7 +104,7 @@ app.post('/api/models', (req, res) => {
       apiKey: apiKey  // Preserve the API key if it was already set and not provided in the request
     };
   });
-
+  
   res.json({ success: true, message: 'Model configurations updated successfully' });
 });
 
@@ -116,7 +116,7 @@ app.get('/api/roles', (req, res) => {
 // Endpoint to update AI role assignments and system prompt
 app.post('/api/roles', (req, res) => {
   const { chatbotText, chatbotVision, chatbotAudio, rag, analysis, sentiment, systemPrompt } = req.body;
-
+  
   if (chatbotText !== undefined) aiRoles.chatbotText = chatbotText;
   if (chatbotVision !== undefined) aiRoles.chatbotVision = chatbotVision;
   if (chatbotAudio !== undefined) aiRoles.chatbotAudio = chatbotAudio;
@@ -124,28 +124,14 @@ app.post('/api/roles', (req, res) => {
   if (analysis !== undefined) aiRoles.analysis = analysis;
   if (sentiment !== undefined) aiRoles.sentiment = sentiment;
   if (systemPrompt !== undefined) aiRoles.systemPrompt = systemPrompt;
-
+  
   res.json({ success: true, message: 'AI roles and system prompt updated successfully' });
-});
-
-// Health check endpoint to prevent sleep
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
-});
-
-// Ping endpoint for external keep-alive services
-app.get('/ping', (req, res) => {
-  res.status(200).send('pong');
 });
 
 // Facebook Webhook Verification Endpoint
 app.get('/webhooks/facebook', (req, res) => {
   const VERIFY_TOKEN = process.env.FB_VERIFY_TOKEN || 'dvc_verify_token_2024_secure';
-
+  
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
@@ -168,7 +154,7 @@ app.get('/webhooks/facebook', (req, res) => {
 app.post('/webhooks/facebook', express.raw({ type: 'application/json' }), async (req, res) => {
   const VERIFY_TOKEN = process.env.FB_VERIFY_TOKEN || 'dvc_verify_token_2024_secure';
   const signature = req.get('X-Hub-Signature-256');
-
+  
   console.log('Received webhook request:', {
     signature,
     body: req.body?.toString ? req.body.toString() : req.body
@@ -186,7 +172,7 @@ app.post('/webhooks/facebook', express.raw({ type: 'application/json' }), async 
   // Check if this is an event from a page subscription
   if (body.object === 'page') {
     // Iterate over each entry - there may be multiple if batched
-    body.entry.forEach(async entry => {
+    body.entry.forEach(async (entry: any) => {
       // Get the webhook event. Standby events are triggered when an app is
       // subscribed to the standby webhook and a message is read or marked as
       // seen by the app
@@ -201,16 +187,16 @@ app.post('/webhooks/facebook', express.raw({ type: 'application/json' }), async 
       if (webhook_event.message && webhook_event.message.text) {
         const message_text = webhook_event.message.text;
         console.log('Received message text:', message_text);
-
+        
         // Process the user message with your AI and send a response back to the user
         try {
           // In a real implementation, you would call your AI service here
           // For now, let's create a simple response
           const response_text = `Cảm ơn bạn đã gửi tin nhắn: "${message_text}". Đây là phản hồi từ hệ thống chatbot.`;
-
+          
           // Use the stored Facebook configuration
           const pageAccessToken = fbConfig.accessToken;
-
+          
           if (pageAccessToken) {
             // Import the function to send message back to Facebook
             const { sendFbMessage } = await import('./services/facebookService.js');
@@ -230,6 +216,20 @@ app.post('/webhooks/facebook', express.raw({ type: 'application/json' }), async 
     // Return a '404 Not Found' if event is not from a page subscription
     res.status(404).send('Not Found');
   }
+});
+
+// Health check endpoint to prevent sleep
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
+// Ping endpoint for external keep-alive services
+app.get('/ping', (req, res) => {
+  res.status(200).send('pong');
 });
 
 // Serve static files from the 'dist' directory

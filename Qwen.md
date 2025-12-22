@@ -262,3 +262,75 @@ Kết hợp cả hai:
 - Một combo cực mạnh cho AI agent thực chiến
 
 Nếu bạn đang build conversational agents thực sự dùng được ngoài đời, đây là thứ bạn nên xem ngay để hệ thống chính xác thông minh hơn.
+
+## 12. Data Persistence Issues and Solutions
+
+### 12.1 Current Persistence Problems
+
+The application currently stores critical configuration data only in browser localStorage, which results in data loss on page reloads. The following data is affected:
+
+1. **AI Model Configurations** (API keys, model settings)
+2. **AI Role Assignments** (which model handles which task)
+3. **System Prompts** (custom instructions for the AI)
+4. **Facebook Integration Settings** (already addressed in previous updates)
+5. **Knowledge Base Documents** (already partially addressed)
+6. **Member Directory** (already partially addressed)
+
+### 12.2 Solution Architecture
+
+To address these issues, we need to implement server-side storage with the following components:
+
+#### 12.2.1 Server-Side Storage Implementation
+- Add in-memory storage for sensitive configuration data
+- Create API endpoints to manage configuration data
+- Implement proper security measures for API keys
+- Add environment variable fallbacks for production deployment
+
+#### 12.2.2 API Endpoints to Implement
+- `GET /api/models` - Retrieve AI model configurations
+- `POST /api/models` - Save AI model configurations
+- `GET /api/roles` - Retrieve AI role assignments
+- `POST /api/roles` - Save AI role assignments
+- `GET /api/system-prompt` - Retrieve system prompt
+- `POST /api/system-prompt` - Save system prompt
+
+#### 12.2.3 Security Considerations
+- API keys should never be exposed in client-side code
+- Implement proper authentication for configuration endpoints
+- Use environment variables as fallbacks but allow runtime configuration
+- Encrypt sensitive data if stored persistently
+
+### 12.3 Implementation Plan
+
+#### Phase 1: Server-Side Configuration Storage
+1. Add in-memory storage for model configurations in server.js
+2. Add API endpoints for model configurations
+3. Update SettingsView to use server API instead of localStorage
+
+#### Phase 2: Role Assignments and System Prompt
+1. Add in-memory storage for role assignments in server.js
+2. Add API endpoints for role assignments and system prompt
+3. Update SettingsView to use server API for these configurations
+
+#### Phase 3: Testing and Validation
+1. Verify data persistence across page reloads
+2. Test API key security
+3. Ensure backward compatibility with existing localStorage data
+
+## 13. Facebook Chat History Integration
+
+### 13.1 Current State
+The Chat History View currently displays only mock data instead of actual conversations fetched from Facebook Graph API. The integration is incomplete and needs to be fully implemented.
+
+### 13.2 Required Improvements
+1. Enhance error handling for Facebook API calls
+2. Implement proper message threading for conversations
+3. Add real-time updates when new messages arrive via webhook
+4. Improve data caching to reduce API calls
+5. Add pagination for large conversation histories
+
+### 13.3 Implementation Plan
+1. Update facebookService.ts to handle full conversation details
+2. Enhance ChatHistoryView to display actual Facebook messages
+3. Implement message synchronization between webhook events and history view
+4. Add loading states and error handling for API calls

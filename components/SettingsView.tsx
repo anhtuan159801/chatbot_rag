@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Facebook, Save, Copy, CheckCircle, RefreshCw,
     Shield, ExternalLink, Link, Check, Cpu, Layers, MessageSquare,
@@ -36,13 +36,40 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // --- AI Models State ---
-  const [models, setModels] = useState<ModelConfig[]>([
-    { id: 'gemini-1', provider: 'gemini', name: 'Google Gemini', modelString: 'gemini-3-flash-preview', apiKey: '', isActive: true },
-    { id: 'openai-1', provider: 'openai', name: 'OpenAI', modelString: 'gpt-4o', apiKey: '', isActive: false },
-    { id: 'openrouter-1', provider: 'openrouter', name: 'OpenRouter', modelString: 'mistral-large', apiKey: '', isActive: false },
-    { id: 'hf-1', provider: 'huggingface', name: 'Hugging Face', modelString: 'bert-base-uncased', apiKey: '', isActive: false },
-  ]);
+  const [models, setModels] = useState<ModelConfig[]>([]);
   const [savingModels, setSavingModels] = useState(false);
+
+  // Load initial models from the server when component mounts
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        const response = await fetch('/api/models');
+        if (response.ok) {
+          const serverModels = await response.json();
+          setModels(serverModels);
+        } else {
+          // Fallback to default models if API call fails
+          setModels([
+            { id: 'gemini-1', provider: 'gemini', name: 'Google Gemini', modelString: 'gemini-3-flash-preview', apiKey: '', isActive: true },
+            { id: 'openai-1', provider: 'openai', name: 'OpenAI', modelString: 'gpt-4o', apiKey: '', isActive: false },
+            { id: 'openrouter-1', provider: 'openrouter', name: 'OpenRouter', modelString: 'openai/whisper-large-v3', apiKey: '', isActive: false },
+            { id: 'hf-1', provider: 'huggingface', name: 'Hugging Face', modelString: 'xiaomi/mimo-v2-flash:free', apiKey: '', isActive: false },
+          ]);
+        }
+      } catch (error) {
+        console.error('Error loading models:', error);
+        // Fallback to default models if API call fails
+        setModels([
+          { id: 'gemini-1', provider: 'gemini', name: 'Google Gemini', modelString: 'gemini-3-flash-preview', apiKey: '', isActive: true },
+          { id: 'openai-1', provider: 'openai', name: 'OpenAI', modelString: 'gpt-4o', apiKey: '', isActive: false },
+          { id: 'openrouter-1', provider: 'openrouter', name: 'OpenRouter', modelString: 'openai/whisper-large-v3', apiKey: '', isActive: false },
+          { id: 'hf-1', provider: 'huggingface', name: 'Hugging Face', modelString: 'xiaomi/mimo-v2-flash:free', apiKey: '', isActive: false },
+        ]);
+      }
+    };
+
+    loadModels();
+  }, []);
 
   // --- AI Roles State ---
   const [roles, setRoles] = useState({
@@ -54,6 +81,44 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
     sentiment: 'hf-1',
     systemPrompt: 'Bạn là Trợ lý ảo Hỗ trợ Thủ tục Hành chính công. Nhiệm vụ của bạn là hướng dẫn công dân chuẩn bị hồ sơ, giải đáp thắc mắc về quy trình, lệ phí và thời gian giải quyết một cách chính xác, lịch sự và căn cứ theo văn bản pháp luật hiện hành. Tuyệt đối không tư vấn các nội dung trái pháp luật.'
   });
+
+  // Load initial roles from the server when component mounts
+  useEffect(() => {
+    const loadRoles = async () => {
+      try {
+        const response = await fetch('/api/roles');
+        if (response.ok) {
+          const serverRoles = await response.json();
+          setRoles(serverRoles);
+        } else {
+          // Fallback to default roles if API call fails
+          setRoles({
+            chatbotText: 'gemini-1',
+            chatbotVision: 'gemini-1',
+            chatbotAudio: 'gemini-1',
+            rag: 'openai-1',
+            analysis: 'gemini-1',
+            sentiment: 'hf-1',
+            systemPrompt: 'Bạn là Trợ lý ảo Hỗ trợ Thủ tục Hành chính công. Nhiệm vụ của bạn là hướng dẫn công dân chuẩn bị hồ sơ, giải đáp thắc mắc về quy trình, lệ phí và thời gian giải quyết một cách chính xác, lịch sự và căn cứ theo văn bản pháp luật hiện hành. Tuyệt đối không tư vấn các nội dung trái pháp luật.'
+          });
+        }
+      } catch (error) {
+        console.error('Error loading roles:', error);
+        // Fallback to default roles if API call fails
+        setRoles({
+          chatbotText: 'gemini-1',
+          chatbotVision: 'gemini-1',
+          chatbotAudio: 'gemini-1',
+          rag: 'openai-1',
+          analysis: 'gemini-1',
+          sentiment: 'hf-1',
+          systemPrompt: 'Bạn là Trợ lý ảo Hỗ trợ Thủ tục Hành chính công. Nhiệm vụ của bạn là hướng dẫn công dân chuẩn bị hồ sơ, giải đáp thắc mắc về quy trình, lệ phí và thời gian giải quyết một cách chính xác, lịch sự và căn cứ theo văn bản pháp luật hiện hành. Tuyệt đối không tư vấn các nội dung trái pháp luật.'
+        });
+      }
+    };
+
+    loadRoles();
+  }, []);
 
   // --- Chat Test State ---
   const [testMessages, setTestMessages] = useState<{role: 'user' | 'bot', text: string}[]>([
@@ -144,13 +209,32 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
     setModels(prev => prev.map(m => m.id === id ? { ...m, isActive: !m.isActive } : m));
   };
 
-  const saveModels = () => {
+  const saveModels = async () => {
     setSavingModels(true);
-    setTimeout(() => {
-        setSavingModels(false);
+
+    try {
+      const response = await fetch('/api/models', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(models)
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
         showToast('Đã lưu cấu hình AI.', 'success');
         setLastSaved(new Date());
-    }, 1000);
+      } else {
+        showToast('Lưu cấu hình AI thất bại.', 'error');
+      }
+    } catch (error) {
+      console.error('Error saving models:', error);
+      showToast('Lỗi kết nối máy chủ khi lưu cấu hình AI.', 'error');
+    } finally {
+      setSavingModels(false);
+    }
   };
 
   const handleTestSend = () => {
@@ -408,9 +492,28 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
                     />
                     <div className="mt-4 flex justify-end">
                         <button
-                            onClick={() => {
-                                showToast('Đã cập nhật System Prompt', 'success');
-                                setLastSaved(new Date());
+                            onClick={async () => {
+                                try {
+                                    const response = await fetch('/api/roles', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify(roles)
+                                    });
+
+                                    const result = await response.json();
+
+                                    if (result.success) {
+                                        showToast('Đã cập nhật System Prompt', 'success');
+                                        setLastSaved(new Date());
+                                    } else {
+                                        showToast('Lưu System Prompt thất bại.', 'error');
+                                    }
+                                } catch (error) {
+                                    console.error('Error saving roles:', error);
+                                    showToast('Lỗi kết nối máy chủ khi lưu System Prompt.', 'error');
+                                }
                             }}
                             className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/10 flex items-center gap-2"
                         >
