@@ -15,6 +15,7 @@ const Select: React.FC<SelectProps> = ({
   fullWidth = false,
   options,
   className = '',
+  id,
   ...props
 }) => {
   const widthClass = fullWidth ? 'w-full' : '';
@@ -22,16 +23,22 @@ const Select: React.FC<SelectProps> = ({
   const borderClass = error ? 'border-red-300 focus:ring-red-500/20 focus:border-red-500' : 'border-slate-200';
   const classes = `${baseClasses} ${borderClass}`;
   
+  // Generate a unique ID if none is provided
+  const selectId = id || (label ? `select-${label.toLowerCase().replace(/\s+/g, '-')}` : undefined);
+  
   return (
     <div className={fullWidth ? 'w-full' : ''}>
       {label && (
-        <label className="block text-sm font-semibold text-slate-700 mb-2">
+        <label htmlFor={selectId} className="block text-sm font-semibold text-slate-700 mb-2">
           {label}
         </label>
       )}
       <div className="relative">
         <select
+          id={selectId}
           className={classes}
+          aria-invalid={!!error}
+          aria-describedby={error || helperText ? `${selectId}-feedback` : undefined}
           {...props}
         >
           {options.map((option) => (
@@ -46,11 +53,13 @@ const Select: React.FC<SelectProps> = ({
           </svg>
         </div>
       </div>
-      {helperText && !error && (
-        <p className="mt-1 text-xs text-slate-500">{helperText}</p>
-      )}
-      {error && (
-        <p className="mt-1 text-xs text-red-600">{error}</p>
+      {(helperText || error) && (
+        <p 
+          id={`${selectId}-feedback`}
+          className={`mt-1 text-xs ${error ? 'text-red-600' : 'text-slate-500'}`}
+        >
+          {error || helperText}
+        </p>
       )}
     </div>
   );

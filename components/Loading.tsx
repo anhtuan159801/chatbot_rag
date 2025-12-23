@@ -17,9 +17,14 @@ const Loading: React.FC<LoadingProps> = ({ size = 'md', text, variant = 'default
 
   if (variant === 'overlay') {
     return (
-      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div 
+        className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center"
+        role="progressbar"
+        aria-busy="true"
+        aria-label={text || "Loading"}
+      >
         <div className="flex flex-col items-center justify-center">
-          <div className={spinnerClasses}></div>
+          <div className={spinnerClasses} aria-hidden="true"></div>
           {text && <p className="mt-4 text-slate-700 font-medium">{text}</p>}
         </div>
       </div>
@@ -27,8 +32,13 @@ const Loading: React.FC<LoadingProps> = ({ size = 'md', text, variant = 'default
   }
 
   return (
-    <div className="flex flex-col items-center justify-center">
-      <div className={spinnerClasses}></div>
+    <div 
+      className="flex flex-col items-center justify-center"
+      role="progressbar"
+      aria-busy="true"
+      aria-label={text || "Loading"}
+    >
+      <div className={spinnerClasses} aria-hidden="true"></div>
       {text && <p className="mt-2 text-slate-600 text-sm">{text}</p>}
     </div>
   );

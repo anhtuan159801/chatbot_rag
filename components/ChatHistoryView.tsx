@@ -124,13 +124,14 @@ const ChatHistoryView: React.FC<ChatHistoryViewProps> = ({ fbConfig }) => {
               <h3 className="text-lg font-bold text-slate-800 mb-3 md:hidden">Hội thoại Facebook</h3>
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
-                    <Search size={16} className="absolute left-3 top-3 text-slate-400" />
+                    <Search size={16} className="absolute left-3 top-3 text-slate-400" aria-hidden="true" />
                     <input
                         type="text"
                         placeholder="Tìm kiếm công dân..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full bg-white border border-slate-200 rounded-lg py-2.5 pl-10 pr-4 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm"
+                        aria-label="Tìm kiếm công dân"
                     />
                 </div>
                 <div className="flex gap-2">
@@ -138,6 +139,7 @@ const ChatHistoryView: React.FC<ChatHistoryViewProps> = ({ fbConfig }) => {
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value as 'all' | 'Active' | 'Closed')}
                     className="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm"
+                    aria-label="Lọc theo trạng thái"
                   >
                     <option value="all">Tất cả trạng thái</option>
                     <option value="Active">Đang hỗ trợ</option>

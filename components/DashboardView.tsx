@@ -209,7 +209,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ documents }) => {
           <h3 className="text-lg font-bold text-slate-900">Lưu lượng Yêu cầu Hỗ trợ</h3>
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-400">Tùy chỉnh biểu đồ:</span>
-            <select className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
+            <select className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1" aria-label="Tùy chỉnh biểu đồ">
               <option>7 ngày gần nhất</option>
               <option>30 ngày gần nhất</option>
               <option>90 ngày gần nhất</option>

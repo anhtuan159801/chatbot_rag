@@ -37,10 +37,17 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={{ showToast }}>
       {children}
       {/* Toast Container */}
-      <div className="fixed bottom-8 right-8 z-50 flex flex-col gap-3 pointer-events-none">
+      <div 
+        className="fixed bottom-8 right-8 z-50 flex flex-col gap-3 pointer-events-none"
+        role="region"
+        aria-live="polite"
+        aria-label="Notifications"
+      >
         {toasts.map((toast) => (
           <div
             key={toast.id}
+            role="alert"
+            aria-label={`${toast.type} notification`}
             className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border backdrop-blur-xl transition-all duration-300 animate-slide-up min-w-[320px] ${
               toast.type === 'success' ? 'bg-white/90 border-green-200 text-green-800' :
               toast.type === 'error' ? 'bg-white/90 border-red-200 text-red-800' :
@@ -53,17 +60,18 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                  toast.type === 'error' ? 'bg-red-100' :
                  toast.type === 'warning' ? 'bg-amber-100' : 'bg-blue-100'
             }`}>
-                {toast.type === 'success' && <CheckCircle size={18} className="text-green-600" />}
-                {toast.type === 'error' && <AlertCircle size={18} className="text-red-600" />}
-                {toast.type === 'warning' && <AlertTriangle size={18} className="text-amber-600" />}
-                {toast.type === 'info' && <Info size={18} className="text-blue-600" />}
+                {toast.type === 'success' && <CheckCircle size={18} className="text-green-600" aria-hidden="true" />}
+                {toast.type === 'error' && <AlertCircle size={18} className="text-red-600" aria-hidden="true" />}
+                {toast.type === 'warning' && <AlertTriangle size={18} className="text-amber-600" aria-hidden="true" />}
+                {toast.type === 'info' && <Info size={18} className="text-blue-600" aria-hidden="true" />}
             </div>
             <span className="text-sm font-semibold flex-1">{toast.message}</span>
             <button
                 onClick={() => removeToast(toast.id)}
                 className="opacity-40 hover:opacity-100 transition-opacity p-1 hover:bg-black/5 rounded-full"
+                aria-label="Dismiss notification"
             >
-              <X size={16} />
+              <X size={16} aria-hidden="true" />
             </button>
           </div>
         ))}

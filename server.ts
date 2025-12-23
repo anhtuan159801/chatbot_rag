@@ -127,13 +127,15 @@ app.post('/api/models', async (req, res) => {
     const updatedModels = req.body;
 
     // Prepare models for database storage
+    // Note: The apiKey field from the request will be ignored,
+    // and the system will use environment variables instead
     const modelsForDb = updatedModels.map((model: any) => {
       return {
         id: model.id,
         provider: model.provider,
         name: model.name,
         model_string: model.modelString,
-        api_key: model.apiKey,  // This would come from a secure source in production
+        api_key: '', // We'll let the service layer handle API key from environment variables
         is_active: model.isActive
       };
     });

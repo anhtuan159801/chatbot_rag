@@ -249,13 +249,14 @@ const MemberDirectoryView: React.FC = () => {
       {/* Search Bar */}
       <div className="flex flex-col sm:flex-row gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         <div className="relative flex-1">
-          <Search size={18} className="absolute left-3 top-3 text-slate-400" />
+          <Search size={18} className="absolute left-3 top-3 text-slate-400" aria-hidden="true" />
           <input
             type="text"
             placeholder="Tìm kiếm thành viên theo tên, vị trí, số điện thoại..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 pl-10 pr-4 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+            aria-label="Tìm kiếm thành viên"
           />
         </div>
       </div>

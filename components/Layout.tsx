@@ -83,7 +83,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
         </nav>
 
         <div className="p-4 border-t border-slate-100">
-          <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-100" aria-label="Trạng thái hệ thống">
+          <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-100" role="status" aria-live="polite">
             <div className="relative flex h-2.5 w-2.5" aria-hidden="true">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
@@ -115,11 +115,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
             </h2>
           </div>
           <div className="flex items-center gap-2 md:gap-4">
-             <div className="px-3 py-1.5 bg-white rounded-md text-[11px] font-bold text-slate-600 border border-slate-200 shadow-sm whitespace-nowrap" aria-label="Khu vực hiện tại">
+             <div className="px-3 py-1.5 bg-white rounded-md text-[11px] font-bold text-slate-600 border border-slate-200 shadow-sm whitespace-nowrap" role="status" aria-live="polite">
                Khu vực: <span className="text-blue-700">TP. Hồ Chí Minh</span>
              </div>
              <div className="hidden md:flex items-center gap-2">
-               <div className="relative flex h-2.5 w-2.5" aria-label="Trạng thái hệ thống">
+               <div className="relative flex h-2.5 w-2.5" role="status" aria-label="Trạng thái hệ thống">
                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                </div>

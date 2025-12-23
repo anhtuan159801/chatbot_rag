@@ -162,9 +162,29 @@ export const updateModels = async (models: AiModel[]): Promise<boolean> => {
     // Then insert the new models
     if (models.length > 0) {
       for (const model of models) {
+        // Use API key from environment variable
+        // The UI no longer sends API keys, so we always use environment variables
+        let apiKey = '';
+        switch (model.provider) {
+          case 'gemini':
+            apiKey = process.env.GEMINI_API_KEY || '';
+            break;
+          case 'openai':
+            apiKey = process.env.OPENAI_API_KEY || '';
+            break;
+          case 'openrouter':
+            apiKey = process.env.OPENROUTER_API_KEY || '';
+            break;
+          case 'huggingface':
+            apiKey = process.env.HUGGINGFACE_API_KEY || '';
+            break;
+          default:
+            apiKey = '';
+        }
+
         await pgClient.query(
           'INSERT INTO ai_models (id, provider, name, model_string, api_key, is_active) VALUES ($1, $2, $3, $4, $5, $6)',
-          [model.id, model.provider, model.name, model.model_string, model.api_key, model.is_active]
+          [model.id, model.provider, model.name, model.model_string, apiKey, model.is_active]
         );
       }
     }
@@ -319,7 +339,7 @@ export const initializeAiModels = async (): Promise<void> => {
     const result = await pgClient.query(
       'SELECT COUNT(*) FROM ai_models'
     );
-    
+
     const count = parseInt(result.rows[0].count);
     if (count > 0) {
       // Models already exist, no need to initialize
@@ -368,7 +388,7 @@ export const initializeAiModels = async (): Promise<void> => {
         [model.id, model.provider, model.name, model.model_string, model.api_key, model.is_active]
       );
     }
-    
+
     console.log('Initialized default AI models');
   } catch (error) {
     console.error('Error initializing AI models:', error);

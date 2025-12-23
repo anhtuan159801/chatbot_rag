@@ -43,7 +43,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ documents, setDoc
       setIsUploading(true);
       showToast(`Đang tải lên ${files.length} văn bản...`, 'info');
 
-      const newDocs: KnowledgeDocument[] = files.map(file => ({
+      const newDocs: KnowledgeDocument[] = files.map((file: File) => ({
         id: Math.random().toString(36).substr(2, 9),
         name: file.name,
         type: file.name.toLowerCase().endsWith('.pdf') ? DocumentType.PDF : DocumentType.DOCX,
@@ -290,13 +290,14 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ documents, setDoc
       {/* Search and Filter Bar */}
       <div className="flex flex-col sm:flex-row gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         <div className="relative flex-1">
-          <Search size={18} className="absolute left-3 top-3 text-slate-400" />
+          <Search size={18} className="absolute left-3 top-3 text-slate-400" aria-hidden="true" />
           <input
             type="text"
             placeholder="Tìm kiếm văn bản..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 pl-10 pr-4 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+            aria-label="Tìm kiếm văn bản"
           />
         </div>
         <div className="flex gap-2">
@@ -304,6 +305,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ documents, setDoc
             value={sortField}
             onChange={(e) => handleSort(e.target.value as keyof KnowledgeDocument)}
             className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+            aria-label="Sắp xếp theo"
           >
             <option value="name">Sắp xếp theo tên</option>
             <option value="uploadDate">Sắp xếp theo ngày</option>
@@ -315,7 +317,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ documents, setDoc
 
       <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
         <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[800px]">
+            <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider font-semibold">
                         <th className="p-4 w-12 text-center">
@@ -337,7 +339,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ documents, setDoc
                           </div>
                         </th>
                         <th
-                          className="p-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                          className="p-4 cursor-pointer hover:bg-slate-100 transition-colors hidden md:table-cell"
                           onClick={() => handleSort('type')}
                         >
                           <div className="flex items-center gap-1">
@@ -355,7 +357,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ documents, setDoc
                           </div>
                         </th>
                         <th
-                          className="p-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                          className="p-4 cursor-pointer hover:bg-slate-100 transition-colors hidden md:table-cell"
                           onClick={() => handleSort('vectorCount')}
                         >
                           <div className="flex items-center gap-1">
@@ -364,7 +366,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ documents, setDoc
                           </div>
                         </th>
                         <th
-                          className="p-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                          className="p-4 cursor-pointer hover:bg-slate-100 transition-colors hidden md:table-cell"
                           onClick={() => handleSort('size')}
                         >
                           <div className="flex items-center gap-1">
@@ -373,7 +375,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ documents, setDoc
                           </div>
                         </th>
                         <th
-                          className="p-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                          className="p-4 cursor-pointer hover:bg-slate-100 transition-colors hidden md:table-cell"
                           onClick={() => handleSort('uploadDate')}
                         >
                           <div className="flex items-center gap-1">
@@ -413,16 +415,34 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ documents, setDoc
                                         <div className={`p-2 rounded-lg ${doc.type === DocumentType.WEB_CRAWL ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
                                             {doc.type === DocumentType.WEB_CRAWL ? <Globe size={18} /> : <FileText size={18} />}
                                         </div>
-                                        <span className="font-medium text-slate-800 truncate max-w-[200px] md:max-w-[300px] block" title={doc.name}>{doc.name}</span>
+                                        <div>
+                                          <span className="font-medium text-slate-800 truncate max-w-[120px] sm:max-w-[150px] md:max-w-[300px] block" title={doc.name}>{doc.name}</span>
+                                          <div className="md:hidden text-xs text-slate-500 mt-1">
+                                            <span className="font-semibold">Định dạng:</span> {doc.type} | 
+                                            <span className="font-semibold ml-1">Trạng thái:</span> {doc.status === IngestionStatus.COMPLETED ? 'Hoàn tất' : doc.status === IngestionStatus.PROCESSING ? 'Đang xử lý' : doc.status === IngestionStatus.VECTORIZING ? 'Vector hóa' : doc.status} |
+                                            <span className="font-semibold ml-1">Số Vector:</span> {doc.vectorCount > 0 ? doc.vectorCount.toLocaleString() : '-'} |
+                                            <span className="font-semibold ml-1">Dung lượng:</span> {doc.size}
+                                          </div>
+                                        </div>
                                     </div>
                                 </td>
-                                <td className="p-4">
+                                <td className="p-4 hidden md:table-cell">
                                     <span className="text-[11px] font-bold px-2 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200">
                                         {doc.type}
                                     </span>
                                 </td>
                                 <td className="p-4">
-                                    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(doc.status)}`}>
+                                    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(doc.status)} md:hidden`}>
+                                        {doc.status === IngestionStatus.COMPLETED && <CheckCircle size={12} />}
+                                        {doc.status === IngestionStatus.PROCESSING && <RefreshCw size={12} className="animate-spin" />}
+                                        {doc.status === IngestionStatus.VECTORIZING && <RefreshCw size={12} className="animate-spin" />}
+                                        {doc.status === IngestionStatus.PENDING && <Clock size={12} />}
+                                        {doc.status === IngestionStatus.FAILED && <AlertCircle size={12} />}
+                                        {doc.status === IngestionStatus.COMPLETED ? 'Hoàn tất' :
+                                         doc.status === IngestionStatus.PROCESSING ? 'Đang xử lý' :
+                                         doc.status === IngestionStatus.VECTORIZING ? 'Vector hóa' : doc.status}
+                                    </div>
+                                    <div className={`hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(doc.status)}`}>
                                         {doc.status === IngestionStatus.COMPLETED && <CheckCircle size={12} />}
                                         {doc.status === IngestionStatus.PROCESSING && <RefreshCw size={12} className="animate-spin" />}
                                         {doc.status === IngestionStatus.VECTORIZING && <RefreshCw size={12} className="animate-spin" />}
@@ -433,13 +453,13 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ documents, setDoc
                                          doc.status === IngestionStatus.VECTORIZING ? 'Vector hóa' : doc.status}
                                     </div>
                                 </td>
-                                <td className="p-4 text-slate-700 font-mono text-sm">
+                                <td className="p-4 text-slate-700 font-mono text-sm hidden md:table-cell">
                                     {doc.vectorCount > 0 ? doc.vectorCount.toLocaleString() : '-'}
                                 </td>
-                                <td className="p-4 text-slate-500 text-sm">
+                                <td className="p-4 text-slate-500 text-sm hidden md:table-cell">
                                     {doc.size}
                                 </td>
-                                <td className="p-4 text-slate-500 text-sm flex items-center gap-2">
+                                <td className="p-4 text-slate-500 text-sm flex items-center gap-2 hidden md:table-cell">
                                     <Clock size={14} />
                                     <span className="whitespace-nowrap">{new Date(doc.uploadDate).toLocaleDateString('vi-VN')}</span>
                                 </td>
