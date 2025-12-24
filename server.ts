@@ -261,13 +261,20 @@ app.post('/webhooks/facebook', express.raw({ type: 'application/json' }), async 
   
   console.log('Received webhook request:', {
     signature,
-    body: req.body?.toString ? req.body.toString() : req.body
+    body: typeof req.body === 'string' ? req.body : req.body?.toString ? req.body.toString() : '[Buffer Object]'
   });
 
   // Parse the request body from raw buffer to JSON
   let body;
   try {
-    body = JSON.parse(req.body.toString());
+    // Check if body is already an object or a buffer/string
+    if (typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
+      // Body is already parsed as an object
+      body = req.body;
+    } else {
+      // Body is a buffer or string, need to parse
+      body = JSON.parse(req.body.toString());
+    }
   } catch (e) {
     console.error('Error parsing webhook body:', e);
     return res.status(400).send('Bad Request: Invalid JSON');
