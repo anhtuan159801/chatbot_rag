@@ -8,8 +8,8 @@ RUN apk add --no-cache python3 make g++
 # Copy package files
 COPY package*.json ./
 
-# Install production dependencies only (to keep image smaller)
-RUN npm ci --only=production && npm cache clean --force
+# Install all dependencies (both production and development) for building
+RUN npm ci
 
 # Copy source code
 COPY . .
@@ -19,6 +19,9 @@ RUN npm run build
 
 # Compile server-side TypeScript files to JavaScript (creates dist-server folder)
 RUN npx tsc --project tsconfig.server.json
+
+# Remove development dependencies to reduce image size
+RUN npm ci --only=production && npm cache clean --force
 
 # Remove build dependencies to reduce image size
 RUN apk del python3 make g++
