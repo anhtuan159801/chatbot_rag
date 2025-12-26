@@ -92,13 +92,23 @@ export const fetchConversationMessages = async (conversationId: string, accessTo
  */
 export const sendFbMessage = async (psid: string, messageText: string, accessToken: string) => {
   try {
+    if (!messageText || messageText.trim() === '') {
+      throw new Error('Message text cannot be empty');
+    }
+
+    const requestBody = {
+      recipient: { id: psid },
+      message: { text: messageText }
+    };
+
     const response = await fetch(
-      `${GRAPH_API_URL}/me/messages?recipient={"id":"${psid}"}&message={"text":"${encodeURIComponent(messageText)}"}&access_token=${accessToken}`,
+      `${GRAPH_API_URL}/me/messages?access_token=${accessToken}`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        body: JSON.stringify(requestBody)
       }
     );
 

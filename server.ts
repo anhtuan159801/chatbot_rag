@@ -282,53 +282,68 @@ app.post('/webhooks/facebook', express.raw({ type: 'application/json' }), async 
 
   // Check if this is an event from a page subscription
   if (body.object === 'page') {
-    // Iterate over each entry - there may be multiple if batched
-    body.entry.forEach(async (entry: any) => {
-      // Get the webhook event. Standby events are triggered when an app is
-      // subscribed to the standby webhook and a message is read or marked as
-      // seen by the app
+    body.entry.forEach((entry: any) => {
       const webhook_event = entry.messaging[0];
       console.log('Webhook received event:', webhook_event);
 
-      // Get the sender PSID (Page Scoped ID)
       const sender_psid = webhook_event.sender.id;
       console.log('Sender PSID:', sender_psid);
 
-      // Check if the message is a text message
       if (webhook_event.message && webhook_event.message.text) {
         const message_text = webhook_event.message.text;
         console.log('Received message text:', message_text);
         
-        // Process the user message with your AI and send a response back to the user
-        try {
-          // In a real implementation, you would call your AI service here
-          // For now, let's create a simple response
-          const response_text = `Cảm ơn bạn đã gửi tin nhắn: "${message_text}". Đây là phản hồi từ hệ thống chatbot.`;
-
-          // Use the stored Facebook configuration from Supabase
-          const config = await getConfig('facebook_config');
-          const pageAccessToken = config?.accessToken;
-
-          if (pageAccessToken) {
-            // Import the function to send message back to Facebook
-            const { sendFbMessage } = await import('./services/facebookService.js');
-            await sendFbMessage(sender_psid, response_text, pageAccessToken);
-          } else {
-            console.log('Page access token not available, skipping response');
-          }
-        } catch (error) {
-          console.error('Error processing message or sending response:', error);
-        }
+        processMessageAsync(sender_psid, message_text).catch(err => {
+          console.error('Unhandled error in message processing:', err);
+        });
       }
     });
 
-    // Return a '200 OK' response to all webhook events
     res.status(200).send('EVENT_RECEIVED');
   } else {
-    // Return a '404 Not Found' if event is not from a page subscription
     res.status(404).send('Not Found');
   }
 });
+
+async function processMessageAsync(sender_psid: string, message_text: string) {
+  try {
+    const config = await getConfig('facebook_config');
+    const pageAccessToken = config?.accessToken;
+
+    if (!pageAccessToken) {
+      console.error('Page access token not available, cannot send response');
+      return;
+    }
+
+    let response_text = `Cảm ơn bạn đã gửi tin nhắn: "${message_text}". Đây là phản hồi từ hệ thống chatbot.`;
+
+    try {
+      const { GoogleGenAI } = await import('@google/genai');
+      const apiKey = process.env.GEMINI_API_KEY;
+      
+      if (apiKey) {
+        const systemPrompt = await getConfig('system_prompt') || 'Bạn là trợ lý ảo hữu ích.';
+        const ai = new GoogleGenAI({ apiKey });
+        
+        const response = await ai.models.generateContent({
+          model: 'gemini-3-flash-preview',
+          contents: `${systemPrompt}\n\nNgười dùng: ${message_text}\n\nTrả lời ngắn gọn, hữu ích:`,
+        });
+        
+        if (response.text && response.text.trim()) {
+          response_text = response.text;
+        }
+      }
+    } catch (aiError) {
+      console.error('AI generation failed, using fallback response:', aiError);
+    }
+
+    const { sendFbMessage } = await import('./services/facebookService.js');
+    await sendFbMessage(sender_psid, response_text, pageAccessToken);
+  } catch (error) {
+    console.error('Error processing message or sending response:', error);
+  }
+}
 
 // Health check endpoint to prevent sleep
 app.get('/health', (req, res) => {
@@ -379,17 +394,33 @@ const initializeSystem = async () => {
 
 // Initialize system data when server starts and then start listening
 initializeSystem().then(() => {
-  // Keep-alive mechanism to prevent sleep on deployment platforms
-  setInterval(() => {
-    console.log('Keep-alive ping:', new Date().toISOString());
-  }, 300000); // Every 5 minutes
+  const keepAliveInterval = setInterval(async () => {
+    try {
+      const response = await fetch(`http://localhost:${PORT}/health`);
+      if (response.ok) {
+        console.log('Keep-alive ping:', new Date().toISOString());
+      } else {
+        console.warn('Keep-alive ping failed:', response.status);
+      }
+    } catch (err) {
+      console.error('Keep-alive ping error:', err);
+    }
+  }, 240000);
 
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
     console.log(`Health check endpoint available at http://localhost:${PORT}/health`);
     console.log(`Ping endpoint available at http://localhost:${PORT}/ping`);
+    console.log('Keep-alive mechanism active (ping every 4 minutes)');
+  });
+
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully...');
+    clearInterval(keepAliveInterval);
+    process.exit(0);
   });
 }).catch(error => {
   console.error('Failed to initialize system:', error);
-  process.exit(1); // Exit if initialization fails
+  process.exit(1);
 });
+

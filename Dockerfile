@@ -20,14 +20,19 @@ RUN npm run build
 # Compile server-side TypeScript files to JavaScript (creates dist-server folder)
 RUN npx tsc --project tsconfig.server.json
 
-# Remove development dependencies to reduce image size
-RUN npm ci --only=production && npm cache clean --force
+# Create production environment file if not exists
+RUN if [ ! -f .env ]; then touch .env; fi
 
-# Remove build dependencies to reduce image size
-RUN apk del python3 make g++
+# Set default port
+ENV PORT=8000
 
 # Expose the port
-EXPOSE 8080
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:' + process.env.PORT + '/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Start the server
-CMD ["npm", "start"]
+CMD ["node", "dist-server/server.js"]
+
