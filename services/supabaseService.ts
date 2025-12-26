@@ -395,6 +395,14 @@ export const initializeAiModels = async (): Promise<void> => {
         model_string: 'zai-org/GLM-4.7',
         api_key: process.env.HUGGINGFACE_API_KEY || '',
         is_active: false
+      },
+      {
+        id: 'hf-2',
+        provider: 'huggingface',
+        name: 'Google Gemma (HuggingFace)',
+        model_string: 'google/gemma-3-300m',
+        api_key: process.env.HUGGINGFACE_API_KEY || '',
+        is_active: false
       }
     ];
 
