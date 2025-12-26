@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import apiProxy from './services/apiProxy.js'; // Import the API proxy
+import knowledgeBaseService from './services/knowledgeBaseService.js'; // Import the knowledge base service
 import {
   getConfig,
   updateConfig,
@@ -50,6 +51,9 @@ app.use((req, res, next) => {
 
 // Use the API proxy routes
 app.use('/api', apiProxy);
+
+// Use the knowledge base service routes
+app.use('/api', knowledgeBaseService);
 
 // Endpoint to get Facebook configuration (without sensitive data like access token)
 app.get('/api/facebook-config', async (req, res) => {

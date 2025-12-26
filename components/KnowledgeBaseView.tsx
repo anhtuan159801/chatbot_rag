@@ -1,21 +1,37 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Upload, FileText, Globe, RefreshCw, CheckCircle, Clock, AlertCircle, Trash2, X, Link as LinkIcon, Search, SortAsc, Filter } from 'lucide-react';
 import { DocumentType, IngestionStatus, KnowledgeDocument } from '../types';
 import { useToast } from './Toast';
 
-interface KnowledgeBaseViewProps {
-  documents: KnowledgeDocument[];
-  setDocuments: React.Dispatch<React.SetStateAction<KnowledgeDocument[]>>;
-}
-
-const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ documents, setDocuments }) => {
+const KnowledgeBaseView: React.FC = () => {
   const { showToast } = useToast();
-  // Local state for UI interactions only
+  const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState<keyof KnowledgeDocument>('uploadDate');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  // Fetch documents from database on mount
+  useEffect(() => {
+    fetchDocuments();
+    // Poll for updates every 5 seconds
+    const interval = setInterval(fetchDocuments, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchDocuments = async () => {
+    try {
+      const response = await fetch('/api/knowledge-base');
+      if (response.ok) {
+        const data = await response.json();
+        setDocuments(data);
+      }
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+    }
+  };
 
   // Crawl State
   const [showCrawlDialog, setShowCrawlDialog] = useState(false);
@@ -37,46 +53,42 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ documents, setDoc
     return result;
   }, [documents, searchTerm, sortField, sortDirection]);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const files = Array.from(e.target.files);
       setIsUploading(true);
       showToast(`Đang tải lên ${files.length} văn bản...`, 'info');
 
-      const newDocs: KnowledgeDocument[] = files.map((file: File) => ({
-        id: Math.random().toString(36).substr(2, 9),
-        name: file.name,
-        type: file.name.toLowerCase().endsWith('.pdf') ? DocumentType.PDF : DocumentType.DOCX,
-        status: IngestionStatus.PENDING,
-        uploadDate: new Date().toISOString(),
-        vectorCount: 0,
-        size: (file.size / 1024 / 1024).toFixed(2) + ' MB'
-      }));
+      try {
+        const uploadPromises = files.map(async (file: File) => {
+          const type = file.name.toLowerCase().endsWith('.pdf') ? DocumentType.PDF : DocumentType.DOCX;
+          const size = (file.size / 1024 / 1024).toFixed(2) + ' MB';
 
-      // Add documents immediately with PENDING status
-      setDocuments(prev => [...newDocs, ...prev]);
+          const response = await fetch('/api/knowledge-base/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: file.name, type, size })
+          });
 
-      // Simulate processing steps
-      setTimeout(() => {
-        setDocuments(prev => prev.map(d => {
-          if (newDocs.some(nd => nd.id === d.id)) {
-            return { ...d, status: IngestionStatus.PROCESSING };
+          if (!response.ok) {
+            throw new Error(`Failed to upload ${file.name}`);
           }
-          return d;
-        }));
 
-        // Simulate completion for all uploaded files
-        setTimeout(() => {
-          setDocuments(prev => prev.map(d => {
-            if (newDocs.some(nd => nd.id === d.id)) {
-                return { ...d, status: IngestionStatus.COMPLETED, vectorCount: Math.floor(Math.random() * 500) + 50 };
-            }
-            return d;
-          }));
-          setIsUploading(false);
-          showToast(`Đã xử lý xong ${files.length} văn bản.`, 'success');
-        }, 3000);
-      }, 1000);
+          return await response.json();
+        });
+
+        await Promise.all(uploadPromises);
+        await fetchDocuments();
+        setIsUploading(false);
+        showToast(`Đã tải lên ${files.length} văn bản thành công. Đang xử lý...`, 'success');
+      } catch (error) {
+        console.error('Upload error:', error);
+        setIsUploading(false);
+        showToast('Lỗi khi tải lên văn bản', 'error');
+      }
+
+      // Clear input
+      e.target.value = '';
     }
   };
 
@@ -125,16 +137,28 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ documents, setDoc
     }, 1500);
   };
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (window.confirm(`Bạn có chắc chắn muốn xóa văn bản "${name}"? Hành động này sẽ xóa toàn bộ vector liên quan.`)) {
-        setDocuments(prev => prev.filter(doc => doc.id !== id));
-        // Clean up selection if the deleted item was selected
-        setSelectedIds(prev => {
+      try {
+        const response = await fetch(`/api/knowledge-base/${id}`, {
+          method: 'DELETE'
+        });
+
+        if (response.ok) {
+          await fetchDocuments();
+          setSelectedIds(prev => {
             const next = new Set(prev);
             next.delete(id);
             return next;
-        });
-        showToast(`Đã xóa văn bản "${name}".`, 'info');
+          });
+          showToast(`Đã xóa văn bản "${name}".`, 'info');
+        } else {
+          showToast('Lỗi khi xóa văn bản', 'error');
+        }
+      } catch (error) {
+        console.error('Delete error:', error);
+        showToast('Lỗi khi xóa văn bản', 'error');
+      }
     }
   };
 
@@ -197,6 +221,13 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ documents, setDoc
 
   return (
     <div className="space-y-6 h-full flex flex-col relative">
+      {isLoading && documents.length === 0 && (
+        <div className="flex items-center justify-center p-8">
+          <RefreshCw className="animate-spin text-slate-400" size={24} />
+          <span className="ml-3 text-slate-500">Đang tải...</span>
+        </div>
+      )}
+
       {/* Crawl Dialog Modal */}
       {showCrawlDialog && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
