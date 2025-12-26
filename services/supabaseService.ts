@@ -384,7 +384,7 @@ export const initializeAiModels = async (): Promise<void> => {
         id: 'openrouter-1',
         provider: 'openrouter',
         name: 'OpenRouter',
-        model_string: 'openai/whisper-large-v3',
+        model_string: 'xiaomi/mimo-v2-flash:free',
         api_key: process.env.OPENROUTER_API_KEY || '',
         is_active: false
       },
@@ -392,7 +392,7 @@ export const initializeAiModels = async (): Promise<void> => {
         id: 'hf-1',
         provider: 'huggingface',
         name: 'Hugging Face',
-        model_string: 'xiaomi/mimo-v2-flash:free',
+        model_string: 'zai-org/GLM-4.7',
         api_key: process.env.HUGGINGFACE_API_KEY || '',
         is_active: false
       }

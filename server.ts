@@ -1,8 +1,9 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import apiProxy from './services/apiProxy.js'; // Import the API proxy
-import knowledgeBaseService from './services/knowledgeBaseService.js'; // Import the knowledge base service
+import 'dotenv/config';
+import apiProxy from './services/apiProxy.js';
+import knowledgeBaseService from './services/knowledgeBaseService.js';
 import {
   getConfig,
   updateConfig,
