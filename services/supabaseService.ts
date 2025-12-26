@@ -152,16 +152,26 @@ export const updateModels = async (models: AiModel[]): Promise<boolean> => {
     return false;
   }
 
+  const client = pgClient;
+  let hadError = false;
+
   try {
     // Begin transaction
-    await pgClient.query('BEGIN');
+    await client.query('BEGIN');
 
     // First, delete all existing models
-    await pgClient.query('DELETE FROM ai_models');
+    const deleteResult = await client.query('DELETE FROM ai_models');
+    console.log(`Deleted ${deleteResult.rowCount} existing models`);
 
     // Then insert the new models
     if (models.length > 0) {
       for (const model of models) {
+        // Validate required fields
+        if (!model.id || !model.provider || !model.name || !model.model_string) {
+          console.error('Invalid model data:', model);
+          throw new Error(`Invalid model data for ${model.name}`);
+        }
+
         // Use API key from environment variable
         // The UI no longer sends API keys, so we always use environment variables
         let apiKey = '';
@@ -182,21 +192,27 @@ export const updateModels = async (models: AiModel[]): Promise<boolean> => {
             apiKey = '';
         }
 
-        await pgClient.query(
+        const insertResult = await client.query(
           'INSERT INTO ai_models (id, provider, name, model_string, api_key, is_active) VALUES ($1, $2, $3, $4, $5, $6)',
           [model.id, model.provider, model.name, model.model_string, apiKey, model.is_active]
         );
+        console.log(`Inserted model: ${model.name} (ID: ${model.id})`);
       }
     }
 
     // Commit transaction
-    await pgClient.query('COMMIT');
+    await client.query('COMMIT');
+    console.log(`Successfully updated ${models.length} AI models`);
 
     return true;
   } catch (error) {
+    hadError = true;
     console.error('Error updating AI models:', error);
+
+    // Rollback transaction
     try {
-      await pgClient.query('ROLLBACK');
+      await client.query('ROLLBACK');
+      console.log('Transaction rolled back due to error');
     } catch (rollbackError) {
       console.error('Error rolling back transaction:', rollbackError);
     }

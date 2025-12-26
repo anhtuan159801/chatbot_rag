@@ -1,7 +1,8 @@
 -- SQL script to create tables for RAGBot Admin Console
 
--- Enable pgvector extension for vector similarity search
+-- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Table for storing system configurations (Facebook API, System Prompt, etc.)
 CREATE TABLE IF NOT EXISTS system_configs (

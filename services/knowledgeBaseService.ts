@@ -1,5 +1,6 @@
 import express from 'express';
 import pgClient from './supabaseService.js';
+import { getAiRoles, getModels } from './supabaseService.js';
 
 const router = express.Router();
 
@@ -102,8 +103,21 @@ router.delete('/knowledge-base/:id', async (req, res) => {
 // Async function to process document (chunk, embed, store)
 async function processDocumentAsync(documentId: string, name: string) {
   try {
+    console.log(`Starting processing for document: ${name} (${documentId})`);
+
     // Update status to PROCESSING
     await updateDocumentStatus(documentId, 'PROCESSING');
+    console.log(`Status updated to PROCESSING for: ${name}`);
+
+    // Get the configured embedding model from database
+    const roles = await getAiRoles();
+    const ragModelId = roles.rag;
+    const models = await getModels();
+    const embeddingModel = models.find(m => m.id === ragModelId);
+
+    if (!embeddingModel) {
+      console.warn('No embedding model configured, using default HuggingFace model');
+    }
 
     // Simulate document processing (in real implementation, you would:
     // 1. Download the file from contentUrl
@@ -112,36 +126,48 @@ async function processDocumentAsync(documentId: string, name: string) {
     // 4. Generate embeddings for each chunk
     // 5. Store chunks with embeddings in knowledge_chunks table)
 
-    // For demo purposes, we'll just simulate the delay
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // Simulate text extraction and chunking (shortened delay for demo)
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Generate sample chunks based on document name
+    const mockChunks = [
+      `Văn bản pháp luật: ${name} - Điều 1 quy định về nguyên tắc chung`,
+      `Văn bản pháp luật: ${name} - Điều 2 quy định về đối tượng áp dụng`,
+      `Văn bản pháp luật: ${name} - Điều 3 quy định về trình tự thực hiện`,
+      `Văn bản pháp luật: ${name} - Điều 4 quy định về hồ sơ cần chuẩn bị`,
+      `Văn bản pháp luật: ${name} - Điều 5 quy định về thời hạn giải quyết`,
+    ];
+
+    console.log(`Generated ${mockChunks.length} chunks for: ${name}`);
 
     // Update status to VECTORIZING
     await updateDocumentStatus(documentId, 'VECTORIZING');
-
-    // Generate some mock chunks with embeddings
-    const mockChunks = [
-      'Đây là đoạn văn bản mẫu 1 từ tài liệu ' + name,
-      'Đây là đoạn văn bản mẫu 2 từ tài liệu ' + name,
-      'Đây là đoạn văn bản mẫu 3 từ tài liệu ' + name,
-    ];
+    console.log(`Status updated to VECTORIZING for: ${name}`);
 
     const vectorCount = mockChunks.length;
 
+    // Generate and store embeddings for each chunk
     for (let i = 0; i < mockChunks.length; i++) {
-      const embedding = await generateEmbedding(mockChunks[i]);
-      if (embedding && pgClient) {
-        await pgClient.query(
-          `INSERT INTO knowledge_chunks (knowledge_base_id, content, embedding, chunk_index, metadata)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [documentId, mockChunks[i], `[${embedding.join(',')}]`, i, { source: name }]
-        );
+      try {
+        const embedding = await generateEmbedding(mockChunks[i], embeddingModel);
+        if (embedding && pgClient) {
+          await pgClient.query(
+            `INSERT INTO knowledge_chunks (knowledge_base_id, content, embedding, chunk_index, metadata)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [documentId, mockChunks[i], `[${embedding.join(',')}]`, i, { source: name, model: embeddingModel?.model_string || 'default' }]
+          );
+          console.log(`Stored chunk ${i + 1}/${mockChunks.length} for: ${name}`);
+        }
+      } catch (chunkError) {
+        console.error(`Error processing chunk ${i}:`, chunkError);
+        // Continue processing other chunks even if one fails
       }
     }
 
     // Update status to COMPLETED
     await updateDocumentStatus(documentId, 'COMPLETED', vectorCount);
-
     console.log(`Document ${name} processed successfully with ${vectorCount} chunks`);
+
   } catch (error) {
     console.error('Error in processDocumentAsync:', error);
     await updateDocumentStatus(documentId, 'FAILED');
@@ -161,40 +187,87 @@ async function updateDocumentStatus(documentId: string, status: string, vectorCo
   await pgClient.query(query, params);
 }
 
-// Helper function to generate embedding using OpenAI
-async function generateEmbedding(text: string): Promise<number[] | null> {
+// Helper function to generate embedding using configured model
+async function generateEmbedding(text: string, embeddingModel?: any): Promise<number[] | null> {
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      console.warn('OPENAI_API_KEY not set, using mock embedding');
-      return Array(1536).fill(0).map(() => Math.random());
+    let apiKey = '';
+    let apiUrl = '';
+    let embeddingSize = 384;
+
+    // Determine which API to use based on model configuration
+    if (embeddingModel && embeddingModel.api_key) {
+      apiKey = embeddingModel.api_key;
+    } else {
+      // Fallback to environment variable
+      apiKey = process.env.HUGGINGFACE_API_KEY || '';
     }
 
-    const response = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-3-small',
-        input: text
-      })
-    });
+    if (!apiKey) {
+      console.warn('No API key available, using mock embedding');
+      return Array(embeddingSize).fill(0).map(() => Math.random());
+    }
 
-    const data = await response.json();
-
-    if (response.ok && data.data && data.data[0]) {
-      return data.data[0].embedding;
+    // Determine API endpoint based on provider/model
+    if (embeddingModel && embeddingModel.provider === 'openai') {
+      apiUrl = `https://api.openai.com/v1/embeddings`;
+      embeddingSize = 1536;
+    } else if (embeddingModel && embeddingModel.provider === 'huggingface') {
+      apiUrl = 'https://api-inference.huggingface.co/models/BAAI/bge-small-en-v1.5';
+      embeddingSize = 384;
     } else {
-      console.error('OpenAI API error:', data);
-      // Fallback to mock embedding
-      return Array(1536).fill(0).map(() => Math.random());
+      // Default to HuggingFace
+      apiUrl = 'https://api-inference.huggingface.co/models/BAAI/bge-small-en-v1.5';
+      embeddingSize = 384;
+    }
+
+    let response;
+    let data;
+
+    if (embeddingModel && embeddingModel.provider === 'openai') {
+      // Use OpenAI API
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: embeddingModel.model_string || 'text-embedding-3-small',
+          input: text
+        })
+      });
+      data = await response.json();
+
+      if (response.ok && data.data && Array.isArray(data.data)) {
+        return data.data[0].embedding;
+      } else {
+        console.error('OpenAI API error:', data);
+        return Array(embeddingSize).fill(0).map(() => Math.random());
+      }
+    } else {
+      // Use HuggingFace API
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          inputs: text
+        })
+      });
+      data = await response.json();
+
+      if (response.ok && Array.isArray(data)) {
+        return data[0];
+      } else {
+        console.error('HuggingFace API error:', data);
+        return Array(embeddingSize).fill(0).map(() => Math.random());
+      }
     }
   } catch (error) {
     console.error('Error generating embedding:', error);
-    // Fallback to mock embedding
-    return Array(1536).fill(0).map(() => Math.random());
+    return Array(384).fill(0).map(() => Math.random());
   }
 }
 

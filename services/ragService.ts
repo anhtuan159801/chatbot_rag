@@ -30,15 +30,15 @@ export class RAGService {
 
       // Check if knowledge_chunks table exists and has pgvector extension
       const tableExists = await this.checkTableExists('knowledge_chunks');
-      
+
       if (!tableExists) {
         console.log('knowledge_chunks table not found, returning empty results');
         return [];
       }
 
-      // Generate embedding for the query
+      // Generate embedding for query
       const queryEmbedding = await this.generateEmbedding(query);
-      
+
       if (!queryEmbedding) {
         console.error('Failed to generate embedding for query');
         return [];
@@ -71,33 +71,63 @@ export class RAGService {
   }
 
   /**
-   * Generate embedding using OpenAI API
+   * Generate embedding using HuggingFace API (default) or OpenAI API
    */
   private async generateEmbedding(text: string): Promise<number[] | null> {
     try {
-      if (!this.openaiApiKey) {
-        console.warn('OPENAI_API_KEY not set, using dummy embedding');
+      // Try OpenAI first if API key is available
+      if (this.openaiApiKey) {
+        try {
+          const response = await fetch('https://api.openai.com/v1/embeddings', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${this.openaiApiKey}`
+            },
+            body: JSON.stringify({
+              model: 'text-embedding-3-small',
+              input: text
+            })
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.data && Array.isArray(data.data)) {
+            console.log('Generated embedding using OpenAI (1536 dimensions)');
+            return data.data[0].embedding;
+          } else {
+            console.warn('OpenAI API error:', data);
+          }
+        } catch (openaiError) {
+          console.warn('OpenAI embedding failed, trying HuggingFace fallback:', openaiError);
+        }
+      }
+
+      // Fallback to HuggingFace
+      const apiKey = process.env.HUGGINGFACE_API_KEY;
+      if (!apiKey) {
+        console.warn('No API keys available, returning null embedding');
         return null;
       }
 
-      const response = await fetch('https://api.openai.com/v1/embeddings', {
+      const response = await fetch('https://api-inference.huggingface.co/models/BAAI/bge-small-en-v1.5', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.openaiApiKey}`
+          'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: 'text-embedding-3-small',
-          input: text
+          inputs: text
         })
       });
 
       const data = await response.json();
 
-      if (response.ok && data.data && data.data[0]) {
-        return data.data[0].embedding;
+      if (response.ok && Array.isArray(data)) {
+        console.log('Generated embedding using HuggingFace (384 dimensions)');
+        return data[0];
       } else {
-        console.error('OpenAI API error:', data);
+        console.error('HuggingFace API error:', data);
         return null;
       }
     } catch (error) {
@@ -112,11 +142,11 @@ export class RAGService {
   private async checkTableExists(tableName: string): Promise<boolean> {
     try {
       if (!pgClient) return false;
-      
+
       const result = await pgClient.query(
         `SELECT EXISTS (
-           SELECT FROM information_schema.tables 
-           WHERE table_schema = 'public' 
+           SELECT FROM information_schema.tables
+           WHERE table_schema = 'public'
            AND table_name = $1
         )`,
         [tableName]
@@ -137,7 +167,7 @@ export class RAGService {
       return '';
     }
 
-    return chunks.map((chunk, index) => 
+    return chunks.map((chunk, index) =>
       `[Kiến thức ${index + 1}]:\n${chunk.content}\n`
     ).join('\n');
   }
