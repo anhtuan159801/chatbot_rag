@@ -319,19 +319,43 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
 
     try {
       const { GoogleGenAI } = await import('@google/genai');
+      const { ragService } = await import('./services/ragService.js');
+      const { convertMarkdownToText, truncateForFacebook } = await import('./services/textFormatter.js');
       const apiKey = process.env.GEMINI_API_KEY;
       
       if (apiKey) {
         const systemPrompt = await getConfig('system_prompt') || 'Bạn là trợ lý ảo hữu ích.';
+        
+        // RAG: Search knowledge base for relevant chunks
+        const relevantChunks = await ragService.searchKnowledge(message_text, 3);
+        let ragContext = '';
+        
+        if (relevantChunks.length > 0) {
+          ragContext = ragService.formatContext(relevantChunks);
+          console.log(`Found ${relevantChunks.length} relevant knowledge chunks`);
+        } else {
+          console.log('No relevant knowledge chunks found, using general response');
+        }
+
         const ai = new GoogleGenAI({ apiKey });
+        
+        let prompt = '';
+        if (ragContext) {
+          prompt = `${systemPrompt}\n\n${ragContext}\n\nDựa trên các thông tin trên, hãy trả lời câu hỏi của người dùng:\n\nCâu hỏi: ${message_text}\n\nHãy trả lời bằng tiếng Việt, ngắn gọn, dễ hiểu và không sử dụng markdown. Nếu thông tin trên không đủ, hãy nói rõ.`;
+        } else {
+          prompt = `${systemPrompt}\n\nCâu hỏi: ${message_text}\n\nHãy trả lời bằng tiếng Việt, ngắn gọn, dễ hiểu và không sử dụng markdown.`;
+        }
         
         const response = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
-          contents: `${systemPrompt}\n\nNgười dùng: ${message_text}\n\nTrả lời ngắn gọn, hữu ích:`,
+          contents: prompt,
         });
         
         if (response.text && response.text.trim()) {
-          response_text = response.text;
+          // Convert markdown to plain text for Facebook
+          response_text = convertMarkdownToText(response.text);
+          // Truncate if too long
+          response_text = truncateForFacebook(response_text);
         }
       }
     } catch (aiError) {

@@ -1,4 +1,7 @@
--- SQL script to create tables for the RAGBot Admin Console
+-- SQL script to create tables for RAGBot Admin Console
+
+-- Enable pgvector extension for vector similarity search
+CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Table for storing system configurations (Facebook API, System Prompt, etc.)
 CREATE TABLE IF NOT EXISTS system_configs (
@@ -31,6 +34,17 @@ CREATE TABLE IF NOT EXISTS knowledge_base (
     content_url TEXT
 );
 
+-- Table for storing knowledge chunks with embeddings (RAG)
+CREATE TABLE IF NOT EXISTS knowledge_chunks (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    knowledge_base_id UUID REFERENCES knowledge_base(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    embedding vector(1536), -- OpenAI text-embedding-3-small dimension
+    metadata JSONB DEFAULT '{}',
+    chunk_index INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Table for storing AI role assignments
 CREATE TABLE IF NOT EXISTS ai_role_assignments (
     role_key TEXT PRIMARY KEY,
@@ -43,33 +57,13 @@ CREATE INDEX IF NOT EXISTS idx_system_configs_updated_at ON system_configs(updat
 CREATE INDEX IF NOT EXISTS idx_ai_models_is_active ON ai_models(is_active);
 CREATE INDEX IF NOT EXISTS idx_knowledge_base_status ON knowledge_base(status);
 CREATE INDEX IF NOT EXISTS idx_knowledge_base_upload_date ON knowledge_base(upload_date);
+CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_embedding ON knowledge_chunks USING ivfflat (embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_knowledge_base_id ON knowledge_chunks(knowledge_base_id);
 
 -- Enable Row Level Security (RLS) for security (optional, can be configured based on your needs)
 -- This would require additional policies based on your authentication method
 -- ALTER TABLE system_configs ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE ai_models ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE knowledge_base ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE knowledge_chunks ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE ai_role_assignments ENABLE ROW LEVEL SECURITY;
-
--- Insert default system configurations (these will be handled by the application)
--- INSERT INTO system_configs (key, value) VALUES 
--- ('facebook_config', '{"pageId": "", "accessToken": "", "pageName": ""}') 
--- ON CONFLICT (key) DO NOTHING;
-
--- Insert default AI models (these will be handled by the application)
--- INSERT INTO ai_models (id, provider, name, model_string, api_key, is_active) VALUES 
--- ('gemini-1', 'gemini', 'Google Gemini', 'gemini-3-flash-preview', '', true),
--- ('openai-1', 'openai', 'OpenAI', 'gpt-4o', '', false),
--- ('openrouter-1', 'openrouter', 'OpenRouter', 'openai/whisper-large-v3', '', false),
--- ('hf-1', 'huggingface', 'Hugging Face', 'xiaomi/mimo-v2-flash:free', '', false)
--- ON CONFLICT (id) DO NOTHING;
-
--- Insert default AI role assignments (these will be handled by the application)
--- INSERT INTO ai_role_assignments (role_key, model_id) VALUES 
--- ('chatbotText', 'gemini-1'),
--- ('chatbotVision', 'gemini-1'),
--- ('chatbotAudio', 'gemini-1'),
--- ('rag', 'openai-1'),
--- ('analysis', 'gemini-1'),
--- ('sentiment', 'hf-1')
--- ON CONFLICT (role_key) DO NOTHING;
