@@ -1,3 +1,106 @@
+
+## Thêm Google Gemma-3-300m Model (Update: 26/12/2025)
+
+### Vấn đề
+User muốn sử dụng Google Gemma-3-300m model trên HuggingFace để tạo embeddings.
+
+### Giải pháp
+Đã thêm model "Google Gemma (HuggingFace)" với:
+- ID: hf-2
+- Provider: huggingface
+- Model String: google/gemma-3-300m
+- API Key: Sử dụng HUGGINGFACE_API_KEY từ environment
+- is_active: false (mặc định, cần kích hoạt trong Settings)
+
+### Thông tin về Gemma-3-300m
+- Provider: HuggingFace
+- Dimensions: 768 dimensions
+- Padding: 768 -> 1536 để match database schema
+- API Key: HUGGINGFACE_API_KEY
+
+### Cách sử dụng
+
+1. **Vào Settings > Mô hình AI**
+   - Tìm mục "Google Gemma (HuggingFace)" trong danh sách
+   - Nhấn checkbox "Đang hoạt động" (is_active) để kích hoạt
+   - Nhấn nút "Lưu Cấu hình"
+
+2. **Chuyển sang Phân vai & Prompt**
+   - Tìm mục "Truy vấn Dữ liệu (RAG)"
+   - Chọn "hf-2" hoặc tìm model có tên "Google Gemma (HuggingFace)"
+   - Nhấn nút "Lưu Chỉ thị"
+
+3. **Kiểm tra Server Logs**
+   Khi upload tài liệu, mong đợi logs như sau:
+      Found embedding model assignment: rag=hf-2
+   Using assigned HuggingFace model: huggingface/google/gemma-3-300m
+   Generated embedding using assigned HuggingFace model (768 dims -> padded to 1536 dims)
+   Stored chunk 1/5 for: document-name.docx
+   Stored chunk 2/5 for: document-name.docx
+   ...
+   
+### Lưu ý quan trọng
+
+1. **Padding Dimensions**
+   - Gemma-3-300m: 768 dimensions
+   - Database: 1536 dimensions
+   - System sẽ tự động padding: [768 numbers] + [768 zeros] = 1536
+
+2. **API Key**
+   - Cần có HUGGINGFACE_API_KEY trong file .env
+   - Kiểm tra: echo 
+3. **Nếu vẫn gặp lỗi "Lưu cấu hình AI thất bại"**
+   - Kiểm tra server logs: npm start
+   - Tìm logs: "Error updating AI models"
+   - Kiểm tra database connection: node check-db.js
+
+### Troubleshooting
+
+**Lỗi: "Lưu cấu hình AI thất bại"**
+
+Có thể do:
+1. Database connection error
+2. Validation error (missing required fields)
+3. Transaction rollback error
+
+Cách kiểm tra:
+1. Chạy diagnostic tool:
+   ash
+   node diagnose.js
+   2. Kiểm tra output:
+   - Database connection: ✓ SUCCESS
+   - AI Models: hf-2 (Google Gemma) trong danh sách
+   - AI Roles: rag=hf-2
+
+3. Nếu database không kết nối được:
+   - Kiểm tra SUPABASE_URL trong .env
+   - Kiểm tra network connection
+
+**Lỗi: Embedding không được tạo**
+
+Sau khi upload tài liệu, nếu documents vẫn ở trạng thái PENDING:
+
+1. Kiểm tra logs có:
+   - "Using assigned HuggingFace model: huggingface/google/gemma-3-300m"
+   - Nếu không, model chưa được assign cho role RAG
+
+2. Kiểm tra role assignment:
+   - Vào Settings > Phân vai & Prompt
+   - Kiểm tra "Truy vấn Dữ liệu (RAG)" đã chọn model chưa
+   - Nếu chưa, chọn và lưu
+
+3. Kiểm tra API key:
+   ash
+   echo       - Nếu là placeholder hoặc rỗng, cần điền key thật
+
+### So sánh các Model Embedding
+
+| Model | Provider | Dimensions | API Key | Notes |
+|-------|----------|------------|----------|-------|
+| OpenAI gpt-4o | openai | 1536 | OPENAI_API_KEY | Direct match database schema |
+| HuggingFace zai-org/GLM-4.7 | huggingface | 384 -> 1536 | HUGGINGFACE_API_KEY | Padding 1152 zeros |
+| HuggingFace Gemma-3-300m | huggingface | 768 -> 1536 | HUGGINGFACE_API_KEY | Padding 768 zeros |
+| OpenRouter xiaomi/mimo-v2-flash | openrouter | ? -> 1536 | OPENROUTER_API_KEY | Thử model string của họ |
 # Phân vai AI cho Embedding (RAG)
 
 ## Vấn đề
