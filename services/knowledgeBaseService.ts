@@ -373,7 +373,7 @@ async function updateDocumentStatus(documentId: string, status: string, vectorCo
   }
 
   const query = vectorCount !== null
-    ? 'UPDATE knowledge_base SET status = $1, vector_count = $2 WHERE id = $3'
+    ? 'UPDATE knowledge_base SET status = $1, vector_count = $2::integer WHERE id = $3'
     : 'UPDATE knowledge_base SET status = $1 WHERE id = $3';
 
   const params = vectorCount !== null ? [status, vectorCount, documentId] : [status, documentId];
@@ -406,7 +406,8 @@ async function generateEmbedding(text: string, embeddingModel?: any): Promise<nu
     if (embeddingModel && embeddingModel.model_string) {
       apiUrl = `https://router.huggingface.co/models/${embeddingModel.model_string}`;
     } else {
-      apiUrl = 'https://router.huggingface.co/models/Qwen/Qwen3-Embedding-0.6B';
+      // Use a working default model
+      apiUrl = 'https://router.huggingface.co/models/BAAI/bge-small-en-v1.5';
     }
 
     console.log(`[EMBEDDING] Requesting embedding from: ${apiUrl}`);
