@@ -18,7 +18,8 @@ COPY . .
 RUN npm run build
 
 # Force rebuild server-side TypeScript files (no cache for JS files)
-RUN rm -rf dist-server && npx tsc --project tsconfig.server.json
+# Also invalidate npm ci cache
+RUN rm -rf node_modules/.vite dist-server && npm ci && npx tsc --project tsconfig.server.json
 
 # Create production environment file if not exists
 RUN if [ ! -f .env ]; then touch .env; fi
