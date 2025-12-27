@@ -13,8 +13,8 @@ interface ModelConfig {
     id: string;
     provider: 'gemini' | 'openai' | 'openrouter' | 'huggingface';
     name: string;
-    modelString: string; 
-    apiKey: string;
+    modelString: string;
+    apiKey: string; // Still needed for the UI but won't be saved
     isActive: boolean;
 }
 
@@ -50,20 +50,20 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
         } else {
           // Fallback to default models if API call fails
           setModels([
-            { id: 'gemini-1', provider: 'gemini', name: 'Google Gemini', modelString: 'gemini-3-flash-preview', apiKey: '', isActive: true },
-            { id: 'openai-1', provider: 'openai', name: 'OpenAI', modelString: 'gpt-4o', apiKey: '', isActive: false },
-            { id: 'openrouter-1', provider: 'openrouter', name: 'OpenRouter', modelString: 'openai/whisper-large-v3', apiKey: '', isActive: false },
-            { id: 'hf-1', provider: 'huggingface', name: 'Hugging Face', modelString: 'xiaomi/mimo-v2-flash:free', apiKey: '', isActive: false },
+            { id: 'gemini-1', provider: 'gemini', name: 'Google Gemini', modelString: 'gemini-3-flash-preview', apiKey: 'Configured via environment variable', isActive: true },
+            { id: 'openai-1', provider: 'openai', name: 'OpenAI', modelString: 'gpt-4o', apiKey: 'Configured via environment variable', isActive: false },
+            { id: 'openrouter-1', provider: 'openrouter', name: 'OpenRouter', modelString: 'openai/whisper-large-v3', apiKey: 'Configured via environment variable', isActive: false },
+            { id: 'hf-1', provider: 'huggingface', name: 'Hugging Face', modelString: 'xiaomi/mimo-v2-flash:free', apiKey: 'Configured via environment variable', isActive: false },
           ]);
         }
       } catch (error) {
         console.error('Error loading models:', error);
         // Fallback to default models if API call fails
         setModels([
-          { id: 'gemini-1', provider: 'gemini', name: 'Google Gemini', modelString: 'gemini-3-flash-preview', apiKey: '', isActive: true },
-          { id: 'openai-1', provider: 'openai', name: 'OpenAI', modelString: 'gpt-4o', apiKey: '', isActive: false },
-          { id: 'openrouter-1', provider: 'openrouter', name: 'OpenRouter', modelString: 'openai/whisper-large-v3', apiKey: '', isActive: false },
-          { id: 'hf-1', provider: 'huggingface', name: 'Hugging Face', modelString: 'xiaomi/mimo-v2-flash:free', apiKey: '', isActive: false },
+          { id: 'gemini-1', provider: 'gemini', name: 'Google Gemini', modelString: 'gemini-3-flash-preview', apiKey: 'Configured via environment variable', isActive: true },
+          { id: 'openai-1', provider: 'openai', name: 'OpenAI', modelString: 'gpt-4o', apiKey: 'Configured via environment variable', isActive: false },
+          { id: 'openrouter-1', provider: 'openrouter', name: 'OpenRouter', modelString: 'openai/whisper-large-v3', apiKey: 'Configured via environment variable', isActive: false },
+          { id: 'hf-1', provider: 'huggingface', name: 'Hugging Face', modelString: 'xiaomi/mimo-v2-flash:free', apiKey: 'Configured via environment variable', isActive: false },
         ]);
       }
     };
@@ -202,6 +202,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
   };
 
   const updateModelField = (id: string, field: keyof ModelConfig, value: string) => {
+    // Don't update the API key field since it's handled by environment variables
+    if (field === 'apiKey') {
+      return;
+    }
     setModels(prev => prev.map(m => m.id === id ? { ...m, [field]: value } : m));
   };
 
@@ -296,23 +300,56 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
             <form onSubmit={handleFbConnect} className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Page ID</label>
-                  <input type="text" value={fbConfig.pageId} onChange={(e) => setFbConfig({...fbConfig, pageId: e.target.value})} placeholder="VD: 1029384756" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all focus:bg-white" required />
+                  <label htmlFor="fb-page-id" className="text-sm font-semibold text-slate-700">Page ID</label>
+                  <input 
+                    id="fb-page-id"
+                    type="text" 
+                    value={fbConfig.pageId} 
+                    onChange={(e) => setFbConfig({...fbConfig, pageId: e.target.value})} 
+                    placeholder="VD: 1029384756" 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all focus:bg-white" 
+                    required 
+                    aria-describedby="fb-page-id-help"
+                  />
+                  <p id="fb-page-id-help" className="text-xs text-slate-500">Nhập ID của trang Facebook bạn muốn kết nối</p>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Tên Trang (Tùy chọn)</label>
-                  <input type="text" value={fbConfig.pageName} onChange={(e) => setFbConfig({...fbConfig, pageName: e.target.value})} placeholder="VD: Cổng DVC Tỉnh X" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all focus:bg-white" />
+                  <label htmlFor="fb-page-name" className="text-sm font-semibold text-slate-700">Tên Trang (Tùy chọn)</label>
+                  <input 
+                    id="fb-page-name"
+                    type="text" 
+                    value={fbConfig.pageName} 
+                    onChange={(e) => setFbConfig({...fbConfig, pageName: e.target.value})} 
+                    placeholder="VD: Cổng DVC Tỉnh X" 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all focus:bg-white" 
+                    aria-describedby="fb-page-name-help"
+                  />
+                  <p id="fb-page-name-help" className="text-xs text-slate-500">Tên hiển thị cho trang (tùy chọn)</p>
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700">Page Access Token</label>
+                <label htmlFor="fb-access-token" className="text-sm font-semibold text-slate-700">Page Access Token</label>
                 <div className="relative">
-                  <input type={showFbToken ? "text" : "password"} value={fbConfig.accessToken} onChange={(e) => setFbConfig({...fbConfig, accessToken: e.target.value})} placeholder="EAA..." className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none pr-10 transition-all focus:bg-white" required />
-                  <button type="button" onClick={() => setShowFbToken(!showFbToken)} className="absolute right-3 top-3 text-slate-400 hover:text-slate-600">
+                  <input 
+                    id="fb-access-token"
+                    type={showFbToken ? "text" : "password"} 
+                    value={fbConfig.accessToken} 
+                    onChange={(e) => setFbConfig({...fbConfig, accessToken: e.target.value})} 
+                    placeholder="EAA..." 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none pr-10 transition-all focus:bg-white" 
+                    required 
+                    aria-describedby="fb-access-token-help"
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowFbToken(!showFbToken)} 
+                    className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                    aria-label={showFbToken ? "Ẩn token" : "Hiển thị token"}
+                  >
                     {showFbToken ? <Eye size={16} /> : <EyeOff size={16} />}
                   </button>
                 </div>
-                <p className="text-xs text-slate-500">Lưu ý: Token cần quyền <code>pages_messaging</code> và <code>pages_read_engagement</code>.</p>
+                <p id="fb-access-token-help" className="text-xs text-slate-500">Lưu ý: Token cần quyền <code>pages_messaging</code> và <code>pages_read_engagement</code>.</p>
               </div>
               <div className="pt-2">
                 <button type="submit" disabled={isConnectingFb} className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold transition-all shadow-lg shadow-slate-900/20 flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 w-full md:w-auto">
@@ -343,8 +380,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
             <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Callback URL</label>
                 <div className="flex flex-col md:flex-row gap-2">
-                    <code className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-slate-600 font-mono text-sm break-all">{window.location.origin}/webhooks/facebook</code>
-                    <button onClick={() => copyToClipboard(`${window.location.origin}/webhooks/facebook`, 'url')} className={`px-4 py-3 md:py-0 border rounded-lg transition-all flex items-center justify-center gap-2 ${copiedField === 'url' ? 'bg-green-50 border-green-200 text-green-600' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-500'}`}>{copiedField === 'url' ? <Check size={18} /> : <Copy size={18} />} <span className="md:hidden">Sao chép</span></button>
+                    <code className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-slate-600 font-mono text-sm break-all" aria-label="Callback URL">{window.location.origin}/webhooks/facebook</code>
+                    <button onClick={() => copyToClipboard(`${window.location.origin}/webhooks/facebook`, 'url')} className={`px-4 py-3 md:py-0 border rounded-lg transition-all flex items-center justify-center gap-2 ${copiedField === 'url' ? 'bg-green-50 border-green-200 text-green-600' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-500'}`} aria-label={copiedField === 'url' ? "Đã sao chép" : "Sao chép URL"}>{copiedField === 'url' ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />} <span className="md:hidden">Sao chép</span></button>
                 </div>
             </div>
             <div className="space-y-2">
@@ -384,26 +421,23 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
                                 </label>
                             </div>
                             {model.isActive && (
-                                <div className="animate-in slide-in-from-top-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="animate-in slide-in-from-top-2 grid grid-cols-1 gap-4">
                                     <div className="space-y-1">
                                          <label className="text-xs font-semibold text-slate-500">Mã Mô hình (Model ID)</label>
-                                         <input 
-                                            type="text" 
-                                            value={model.modelString} 
+                                         <input
+                                            type="text"
+                                            value={model.modelString}
                                             onChange={(e) => updateModelField(model.id, 'modelString', e.target.value)}
                                             placeholder="VD: gemini-1.5-pro, gpt-4o"
                                             className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2 text-slate-800 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all shadow-sm"
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-xs font-semibold text-slate-500">API Key</label>
-                                        <input 
-                                            type="password" 
-                                            value={model.apiKey} 
-                                            onChange={(e) => updateModelField(model.id, 'apiKey', e.target.value)}
-                                            placeholder={`Nhập API Key cho ${model.name}`}
-                                            className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2 text-slate-800 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all shadow-sm"
-                                        />
+                                        <label className="text-xs font-semibold text-slate-500">Khóa API</label>
+                                        <div className="w-full bg-slate-100 border border-slate-200 rounded-lg px-4 py-2 text-slate-500 text-sm italic">
+                                            Đã cấu hình từ biến môi trường
+                                        </div>
+                                        <p className="text-xs text-slate-400 mt-1">Khóa API được lấy từ biến môi trường trên hệ thống</p>
                                     </div>
                                 </div>
                             )}
