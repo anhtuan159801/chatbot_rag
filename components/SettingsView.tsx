@@ -37,6 +37,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
 
   // --- AI Models State ---
   const [models, setModels] = useState<ModelConfig[]>([]);
+  const [showAddModel, setShowAddModel] = useState(false);
+  const [newModel, setNewModel] = useState<Partial<ModelConfig>>({
+    provider: 'gemini',
+    name: '',
+    modelString: '',
+    isActive: false
+  });
   const [savingModels, setSavingModels] = useState(false);
 
   // Load initial models from the server when component mounts
