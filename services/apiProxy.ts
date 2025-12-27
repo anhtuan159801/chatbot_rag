@@ -1,7 +1,7 @@
 import express from 'express';
 import { SystemMetrics, KnowledgeDocument } from '../types';
-import { AIService } from './aiService';
-import { getModels, getAiRoles } from './supabaseService';
+import { AIService } from './aiService.js';
+import { getModels, getAiRoles } from './supabaseService.js';
 
 const router = express.Router();
 

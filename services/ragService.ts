@@ -1,6 +1,5 @@
 import { Client } from 'pg';
-
-const pgClient = require('../services/supabaseService').default;
+import pgClient from '../services/supabaseService.js';
 
 interface KnowledgeChunk {
   id: string;
@@ -45,13 +44,17 @@ export class RAGService {
       }
 
       // Search for similar chunks using cosine similarity
-      const result = await pgClient.query(
+      const result = await pgClient?.query(
         `SELECT id, content, metadata, 1 - (embedding <=> $1::vector) as similarity
          FROM knowledge_chunks
          ORDER BY embedding <=> $1::vector
          LIMIT $2`,
         [`[${queryEmbedding.join(',')}]`, topK]
       );
+
+      if (!result) {
+        return [];
+      }
 
       if (result.rows.length === 0) {
         console.log('No relevant chunks found');

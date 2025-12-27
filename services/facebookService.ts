@@ -1,4 +1,4 @@
-import { ChatSession, ChatMessage } from "../types";
+import { ChatSession, ChatMessage } from "../types.js";
 
 const GRAPH_API_URL = 'https://graph.facebook.com/v18.0';
 

@@ -1,4 +1,4 @@
-import { SystemMetrics, KnowledgeDocument } from "../types";
+import { SystemMetrics, KnowledgeDocument } from "../types.js";
 
 export const analyzeSystemHealth = async (
   metrics: SystemMetrics,

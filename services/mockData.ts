@@ -1,4 +1,4 @@
-import { ChatSession, DocumentType, IngestionStatus, KnowledgeDocument, SystemMetrics, SystemStatus } from "../types";
+import { ChatSession, DocumentType, IngestionStatus, KnowledgeDocument, SystemMetrics, SystemStatus } from "../types.js";
 
 export const MOCK_METRICS: SystemMetrics = {
   totalVectors: 25890,
