@@ -146,16 +146,18 @@ export const getModels = async (): Promise<AiModel[]> => {
 /**
  * Update AI models in the database
  */
-export const updateModels = async (models: AiModel[]): Promise<boolean> => {
+export const updateModels = async (models: AiModel[]): Promise<{ success: boolean; error?: string }> => {
   if (!pgClient) {
     console.error('PostgreSQL client not initialized');
-    return false;
+    return { success: false, error: 'PostgreSQL client not initialized' };
   }
 
   const client = pgClient;
-  let hadError = false;
 
   try {
+    console.log('=== Starting updateModels transaction ===');
+    console.log('Models to update:', JSON.stringify(models, null, 2));
+
     // Begin transaction
     await client.query('BEGIN');
 
@@ -166,48 +168,63 @@ export const updateModels = async (models: AiModel[]): Promise<boolean> => {
     // Then insert the new models
     if (models.length > 0) {
       for (const model of models) {
+        console.log(`Processing model: ${model.id} - ${model.name}`);
+
         // Validate required fields
         if (!model.id || !model.provider || !model.name || !model.model_string) {
           console.error('Invalid model data:', model);
-          throw new Error(`Invalid model data for ${model.name}`);
+          throw new Error(`Invalid model data for ${model.name}: missing required fields`);
+        }
+
+        // Validate provider
+        const validProviders = ['gemini', 'openai', 'openrouter', 'huggingface'];
+        if (!validProviders.includes(model.provider.toLowerCase())) {
+          throw new Error(`Invalid provider: ${model.provider}`);
         }
 
         // Use API key from environment variable
         // The UI no longer sends API keys, so we always use environment variables
         let apiKey = '';
-        switch (model.provider) {
+        switch (model.provider.toLowerCase()) {
           case 'gemini':
             apiKey = process.env.GEMINI_API_KEY || '';
+            if (!apiKey) console.warn(`Warning: GEMINI_API_KEY not set for ${model.name}`);
             break;
           case 'openai':
             apiKey = process.env.OPENAI_API_KEY || '';
+            if (!apiKey) console.warn(`Warning: OPENAI_API_KEY not set for ${model.name}`);
             break;
           case 'openrouter':
             apiKey = process.env.OPENROUTER_API_KEY || '';
+            if (!apiKey) console.warn(`Warning: OPENROUTER_API_KEY not set for ${model.name}`);
             break;
           case 'huggingface':
             apiKey = process.env.HUGGINGFACE_API_KEY || '';
+            if (!apiKey) console.warn(`Warning: HUGGINGFACE_API_KEY not set for ${model.name}`);
             break;
           default:
             apiKey = '';
         }
 
         const insertResult = await client.query(
-          'INSERT INTO ai_models (id, provider, name, model_string, api_key, is_active) VALUES ($1, $2, $3, $4, $5, $6)',
+          'INSERT INTO ai_models (id, provider, name, model_string, api_key, is_active) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
           [model.id, model.provider, model.name, model.model_string, apiKey, model.is_active]
         );
-        console.log(`Inserted model: ${model.name} (ID: ${model.id})`);
+        console.log(`✓ Inserted model: ${model.name} (ID: ${model.id}, Active: ${model.is_active})`);
       }
     }
 
     // Commit transaction
     await client.query('COMMIT');
-    console.log(`Successfully updated ${models.length} AI models`);
+    console.log(`✓ Successfully updated ${models.length} AI models`);
+    console.log('=== updateModels transaction completed successfully ===');
 
-    return true;
-  } catch (error) {
-    hadError = true;
-    console.error('Error updating AI models:', error);
+    return { success: true };
+  } catch (error: any) {
+    console.error('=== Error updating AI models ===');
+    console.error('Error details:', error);
+    console.error('Error message:', error?.message);
+    console.error('Error stack:', error?.stack);
 
     // Rollback transaction
     try {
@@ -216,7 +233,11 @@ export const updateModels = async (models: AiModel[]): Promise<boolean> => {
     } catch (rollbackError) {
       console.error('Error rolling back transaction:', rollbackError);
     }
-    return false;
+
+    return {
+      success: false,
+      error: error?.message || 'Unknown error updating models'
+    };
   }
 };
 

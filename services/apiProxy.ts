@@ -1,10 +1,11 @@
 import express from 'express';
-import { GoogleGenAI } from '@google/genai';
 import { SystemMetrics, KnowledgeDocument } from '../types';
+import { AIService } from './aiService';
+import { getModels, getAiRoles } from './supabaseService';
 
 const router = express.Router();
 
-// Proxy endpoint for Gemini API to keep API key secure on the server
+// Proxy endpoint for AI system analysis using configured model
 router.post('/gemini/analyze', async (req, res) => {
   try {
     const { metrics, recentDocs } = req.body as { metrics: SystemMetrics; recentDocs: KnowledgeDocument[] };
@@ -13,14 +14,19 @@ router.post('/gemini/analyze', async (req, res) => {
     if (!metrics || !recentDocs) {
       return res.status(400).json({ error: 'Missing required parameters: metrics and recentDocs' });
     }
-    
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.error("GEMINI_API_KEY environment variable is not set");
-      return res.status(500).json({ error: 'Server configuration error: API key missing' });
+
+    // Get configured model for analysis role
+    const roles = await getAiRoles();
+    const models = await getModels();
+    const analysisModelId = roles.analysis;
+    const modelConfig = models.find(m => m.id === analysisModelId);
+
+    if (!modelConfig || !modelConfig.is_active) {
+      console.error('No active model configured for analysis role');
+      return res.status(500).json({ error: 'No active model configured for system analysis' });
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    console.log(`Using model for analysis: ${modelConfig.name} (${modelConfig.model_string})`);
 
     const prompt = `
       You are an advanced System Administrator AI for a RAG (Retrieval Augmented Generation) Chatbot system.
@@ -39,13 +45,14 @@ router.post('/gemini/analyze', async (req, res) => {
       Keep it under 100 words.
     `;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
+    const result = await AIService.generateText({
+      provider: modelConfig.provider,
+      model: modelConfig.model_string,
+      apiKey: modelConfig.api_key,
+      prompt: prompt,
+      systemPrompt: 'You are a helpful system administrator AI assistant.'
     });
 
-    const result = response.text || "Analysis complete, but no text returned.";
-    
     // Validate the response
     if (!result || result.trim().length === 0) {
       return res.status(500).json({ error: "AI response was empty or invalid" });
@@ -53,17 +60,15 @@ router.post('/gemini/analyze', async (req, res) => {
     
     res.json({ result });
   } catch (error: any) {
-    console.error("Gemini API Proxy Error:", error);
+    console.error("AI Analysis Error:", error);
     
     // More specific error handling
     if (error.status === 401) {
-      res.status(401).json({ error: "Invalid API Key. Please check your Gemini API credentials." });
+      res.status(401).json({ error: "Invalid API Key. Please check your AI API credentials." });
     } else if (error.status === 403) {
       res.status(403).json({ error: "Access denied. Please check your API key permissions." });
     } else if (error.status === 429) {
       res.status(429).json({ error: "Rate limit exceeded. Please try again later." });
-    } else if (error.message?.includes("API_KEY")) {
-      res.status(500).json({ error: "API Key configuration error. Please verify your API key is set correctly." });
     } else {
       res.status(500).json({ error: `Failed to perform AI analysis: ${error.message || 'Unknown error'}` });
     }

@@ -130,6 +130,7 @@ app.get('/api/models', async (req, res) => {
 app.post('/api/models', async (req, res) => {
   try {
     const updatedModels = req.body;
+    console.log('Received models update request:', JSON.stringify(updatedModels, null, 2));
 
     // Prepare models for database storage
     // Note: The apiKey field from the request will be ignored,
@@ -145,14 +146,15 @@ app.post('/api/models', async (req, res) => {
       };
     });
 
-    const success = await updateModels(modelsForDb);
+    const result = await updateModels(modelsForDb);
 
-    if (success) {
+    if (result.success) {
       // Update the in-memory cache
       modelConfigs = updatedModels;
       res.json({ success: true, message: 'Model configurations updated successfully' });
     } else {
-      res.status(500).json({ error: 'Failed to update model configurations' });
+      console.error('Update models failed:', result.error);
+      res.status(500).json({ error: result.error || 'Failed to update model configurations' });
     }
   } catch (error) {
     console.error('Error updating AI models:', error);
@@ -323,14 +325,22 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
     let response_text = `Cảm ơn bạn đã gửi tin nhắn: "${message_text}". Đây là phản hồi từ hệ thống chatbot.`;
 
     try {
-      const { GoogleGenAI } = await import('@google/genai');
+      const { AIService } = await import('./services/aiService.js');
       const { ragService } = await import('./services/ragService.js');
       const { convertMarkdownToText, truncateForFacebook } = await import('./services/textFormatter.js');
-      const apiKey = process.env.GEMINI_API_KEY;
+      const { getModels, getAiRoles } = await import('./services/supabaseService.js');
       
-      if (apiKey) {
-        const systemPrompt = await getConfig('system_prompt') || 'Bạn là trợ lý ảo hữu ích.';
-        
+      const systemPrompt = await getConfig('system_prompt') || 'Bạn là trợ lý ảo hữu ích.';
+      
+      // Get configured models for chatbot and RAG roles
+      const roles = await getAiRoles();
+      const models = await getModels();
+      const chatbotModelId = roles.chatbotText;
+      const chatbotModel = models.find(m => m.id === chatbotModelId);
+
+      if (!chatbotModel || !chatbotModel.is_active) {
+        console.warn('No active chatbot model configured, using fallback response');
+      } else {
         // RAG: Search knowledge base for relevant chunks
         const relevantChunks = await ragService.searchKnowledge(message_text, 3);
         let ragContext = '';
@@ -342,23 +352,26 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
           console.log('No relevant knowledge chunks found, using general response');
         }
 
-        const ai = new GoogleGenAI({ apiKey });
-        
         let prompt = '';
         if (ragContext) {
           prompt = `${systemPrompt}\n\n${ragContext}\n\nDựa trên các thông tin trên, hãy trả lời câu hỏi của người dùng:\n\nCâu hỏi: ${message_text}\n\nHãy trả lời bằng tiếng Việt, ngắn gọn, dễ hiểu và không sử dụng markdown. Nếu thông tin trên không đủ, hãy nói rõ.`;
         } else {
           prompt = `${systemPrompt}\n\nCâu hỏi: ${message_text}\n\nHãy trả lời bằng tiếng Việt, ngắn gọn, dễ hiểu và không sử dụng markdown.`;
         }
+
+        console.log(`Using chatbot model: ${chatbotModel.name} (${chatbotModel.model_string})`);
         
-        const response = await ai.models.generateContent({
-          model: 'gemini-3-flash-preview',
-          contents: prompt,
+        const response = await AIService.generateText({
+          provider: chatbotModel.provider,
+          model: chatbotModel.model_string,
+          apiKey: chatbotModel.api_key,
+          prompt: prompt,
+          systemPrompt: systemPrompt
         });
-        
-        if (response.text && response.text.trim()) {
+
+        if (response && response.trim()) {
           // Convert markdown to plain text for Facebook
-          response_text = convertMarkdownToText(response.text);
+          response_text = convertMarkdownToText(response);
           // Truncate if too long
           response_text = truncateForFacebook(response_text);
         }
