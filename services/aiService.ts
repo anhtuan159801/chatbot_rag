@@ -35,12 +35,62 @@ export class AIService {
     switch (provider.toLowerCase()) {
       case 'gemini':
         return this.generateGeminiText(model, apiKey, prompt, systemPrompt);
+      case 'openai':
+        return this.generateOpenAIText(model, apiKey, prompt, systemPrompt);
       case 'openrouter':
         return this.generateOpenRouterText(model, apiKey, prompt, systemPrompt);
       case 'huggingface':
         return this.generateHuggingFaceText(model, apiKey, prompt, systemPrompt);
       default:
         throw new Error(`Unsupported provider: ${provider}`);
+    }
+  }
+
+  /**
+   * Generate text using OpenAI API
+   */
+  private static async generateOpenAIText(
+    model: string,
+    apiKey: string,
+    prompt: string,
+    systemPrompt?: string
+  ): Promise<string> {
+    if (!apiKey) {
+      throw new Error('OPENAI_API_KEY not configured');
+    }
+
+    const messages: Array<{ role: string; content: string }> = [];
+
+    if (systemPrompt) {
+      messages.push({ role: 'system', content: systemPrompt });
+    }
+    messages.push({ role: 'user', content: prompt });
+
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: messages,
+          max_tokens: 1000,
+          temperature: 0.7
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`OpenAI API error: ${JSON.stringify(error)}`);
+      }
+
+      const data = await response.json();
+      return data.choices[0]?.message?.content || '';
+    } catch (error: any) {
+      console.error('OpenAI API error:', error);
+      throw new Error(`OpenAI API error: ${error.message || 'Unknown error'}`);
     }
   }
 

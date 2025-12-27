@@ -222,7 +222,7 @@ export const updateModels = async (models: AiModel[]): Promise<{ success: boolea
       }
 
       // Validate provider
-      const validProviders = ['gemini', 'openrouter', 'huggingface'];
+      const validProviders = ['gemini', 'openai', 'openrouter', 'huggingface'];
       if (!validProviders.includes(model.provider.toLowerCase())) {
         throw new Error(`Invalid provider: ${model.provider}`);
       }
@@ -234,6 +234,10 @@ export const updateModels = async (models: AiModel[]): Promise<{ success: boolea
         case 'gemini':
           apiKey = process.env.GEMINI_API_KEY || '';
           if (!apiKey) console.warn(`Warning: GEMINI_API_KEY not set for ${model.name}`);
+          break;
+        case 'openai':
+          apiKey = process.env.OPENAI_API_KEY || '';
+          if (!apiKey) console.warn(`Warning: OPENAI_API_KEY not set for ${model.name}`);
           break;
         case 'openrouter':
           apiKey = process.env.OPENROUTER_API_KEY || '';
