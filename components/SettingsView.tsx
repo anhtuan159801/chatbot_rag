@@ -572,10 +572,95 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
                          {savingModels ? <RefreshCw size={18} className="animate-spin" /> : <Save size={18} />}
                          Lưu Cấu hình
                      </button>
-          </div>
-          </div>
-      </div>
-    );
+                 </div>
+             </div>
+         </div>
+             </div>
+
+             {/* Add Model Form */}
+             {showAddModel && (
+                 <div className="p-6 bg-blue-50 border-t border-blue-100 animate-in slide-in-from-top-2">
+                     <h4 className="text-sm font-bold text-slate-800 mb-4">Thêm Mô hình AI Mới</h4>
+                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                         <div className="space-y-1">
+                             <label className="text-xs font-semibold text-slate-500">Nhà cung cấp</label>
+                             <select
+                                 value={newModel.provider}
+                                 onChange={(e) => setNewModel({...newModel, provider: e.target.value as any})}
+                                 className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                             >
+                                 <option value="gemini">Google Gemini</option>
+                                 <option value="openai">OpenAI</option>
+                                 <option value="openrouter">OpenRouter</option>
+                                 <option value="huggingface">HuggingFace</option>
+                             </select>
+                         </div>
+                         <div className="space-y-1">
+                             <label className="text-xs font-semibold text-slate-500">Tên mô hình</label>
+                             <input
+                                 type="text"
+                                 value={newModel.name}
+                                 onChange={(e) => setNewModel({...newModel, name: e.target.value})}
+                                 placeholder="VD: Gemini Pro 1.5"
+                                 className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                             />
+                         </div>
+                         <div className="space-y-1">
+                             <label className="text-xs font-semibold text-slate-500">Mã Model</label>
+                             <input
+                                 type="text"
+                                 value={newModel.modelString}
+                                 onChange={(e) => setNewModel({...newModel, modelString: e.target.value})}
+                                 placeholder="VD: gemini-1.5-pro, gpt-4o"
+                                 className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                             />
+                         </div>
+                     </div>
+                     <div className="flex gap-2 mt-4">
+                         <button
+                             onClick={addModel}
+                             className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+                         >
+                             Thêm Model
+                         </button>
+                         <button
+                             onClick={() => setShowAddModel(false)}
+                             className="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50"
+                         >
+                             Hủy
+                         </button>
+                     </div>
+                 </div>
+             )}
+
+             <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
+                 <button
+                     onClick={() => setShowAddModel(!showAddModel)}
+                     className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-200 flex items-center gap-2"
+                 >
+                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
+                     Thêm Mô hình Mới
+                 </button>
+                 <div className="flex items-center gap-3">
+                     {lastSaved && (
+                         <div className="text-xs text-slate-400 flex items-center gap-2">
+                             <Zap size={14} />
+                             Đã lưu lần cuối: {lastSaved.toLocaleTimeString('vi-VN')}
+                         </div>
+                     )}
+                     <button
+                         onClick={saveModels}
+                         disabled={savingModels}
+                         className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold transition-all shadow-lg shadow-slate-900/20 flex items-center justify-center gap-2 active:scale-95"
+                     >
+                         {savingModels ? <RefreshCw size={18} className="animate-spin" /> : <Save size={18} />}
+                         Lưu Cấu hình
+                     </button>
+                 </div>
+             </div>
+         </div>
+     </div>
+   );
 
   const renderRoles = () => (
     <div className="space-y-6">
