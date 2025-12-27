@@ -45,37 +45,40 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
     isActive: false
   });
   const [savingModels, setSavingModels] = useState(false);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [originalModels, setOriginalModels] = useState<ModelConfig[]>([]);
+
+  // Function to load models from server - can be reused
+  const loadModelsFromServer = async () => {
+    setLoadingModels(true);
+    try {
+      const response = await fetch('/api/models');
+      if (response.ok) {
+        const serverModels = await response.json();
+        console.log('Loaded models from server:', serverModels);
+        setModels(serverModels);
+        setOriginalModels(JSON.parse(JSON.stringify(serverModels)));
+        setHasUnsavedChanges(false);
+        return true;
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to load models:', errorData);
+        showToast(`Lỗi tải mô hình: ${errorData.error || 'Không thể kết nối máy chủ'}`, 'error');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error loading models:', error);
+      showToast('Lỗi kết nối máy chủ khi tải danh sách mô hình', 'error');
+      return false;
+    } finally {
+      setLoadingModels(false);
+    }
+  };
 
   // Load initial models from the server when component mounts
   useEffect(() => {
-    const loadModels = async () => {
-      try {
-        const response = await fetch('/api/models');
-        if (response.ok) {
-          const serverModels = await response.json();
-          setModels(serverModels);
-        } else {
-          // Fallback to default models if API call fails
-          setModels([
-            { id: 'gemini-1', provider: 'gemini', name: 'Google Gemini', modelString: 'gemini-3-flash-preview', apiKey: 'Configured via environment variable', isActive: true },
-            { id: 'openai-1', provider: 'openai', name: 'OpenAI', modelString: 'gpt-4o', apiKey: 'Configured via environment variable', isActive: false },
-            { id: 'openrouter-1', provider: 'openrouter', name: 'OpenRouter', modelString: 'openai/whisper-large-v3', apiKey: 'Configured via environment variable', isActive: false },
-            { id: 'hf-1', provider: 'huggingface', name: 'Hugging Face', modelString: 'xiaomi/mimo-v2-flash:free', apiKey: 'Configured via environment variable', isActive: false },
-          ]);
-        }
-      } catch (error) {
-        console.error('Error loading models:', error);
-        // Fallback to default models if API call fails
-        setModels([
-          { id: 'gemini-1', provider: 'gemini', name: 'Google Gemini', modelString: 'gemini-3-flash-preview', apiKey: 'Configured via environment variable', isActive: true },
-          { id: 'openai-1', provider: 'openai', name: 'OpenAI', modelString: 'gpt-4o', apiKey: 'Configured via environment variable', isActive: false },
-          { id: 'openrouter-1', provider: 'openrouter', name: 'OpenRouter', modelString: 'openai/whisper-large-v3', apiKey: 'Configured via environment variable', isActive: false },
-          { id: 'hf-1', provider: 'huggingface', name: 'Hugging Face', modelString: 'xiaomi/mimo-v2-flash:free', apiKey: 'Configured via environment variable', isActive: false },
-        ]);
-      }
-    };
-
-    loadModels();
+    loadModelsFromServer();
   }, []);
 
   // --- AI Roles State ---
@@ -88,6 +91,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
     sentiment: 'hf-1',
     systemPrompt: 'Bạn là Trợ lý ảo Hỗ trợ Thủ tục Hành chính công. Nhiệm vụ của bạn là hướng dẫn công dân chuẩn bị hồ sơ, giải đáp thắc mắc về quy trình, lệ phí và thời gian giải quyết một cách chính xác, lịch sự và căn cứ theo văn bản pháp luật hiện hành. Tuyệt đối không tư vấn các nội dung trái pháp luật.'
   });
+  const [hasUnsavedRoles, setHasUnsavedRoles] = useState(false);
+  const [savingRoles, setSavingRoles] = useState(false);
 
   // Load initial roles from the server when component mounts
   useEffect(() => {
@@ -97,30 +102,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
         if (response.ok) {
           const serverRoles = await response.json();
           setRoles(serverRoles);
+          setHasUnsavedRoles(false);
         } else {
           // Fallback to default roles if API call fails
-          setRoles({
-            chatbotText: 'gemini-1',
-            chatbotVision: 'gemini-1',
-            chatbotAudio: 'gemini-1',
-            rag: 'openai-1',
-            analysis: 'gemini-1',
-            sentiment: 'hf-1',
-            systemPrompt: 'Bạn là Trợ lý ảo Hỗ trợ Thủ tục Hành chính công. Nhiệm vụ của bạn là hướng dẫn công dân chuẩn bị hồ sơ, giải đáp thắc mắc về quy trình, lệ phí và thời gian giải quyết một cách chính xác, lịch sự và căn cứ theo văn bản pháp luật hiện hành. Tuyệt đối không tư vấn các nội dung trái pháp luật.'
-          });
+          console.error('Failed to load roles, using defaults');
         }
       } catch (error) {
         console.error('Error loading roles:', error);
-        // Fallback to default roles if API call fails
-        setRoles({
-          chatbotText: 'gemini-1',
-          chatbotVision: 'gemini-1',
-          chatbotAudio: 'gemini-1',
-          rag: 'openai-1',
-          analysis: 'gemini-1',
-          sentiment: 'hf-1',
-          systemPrompt: 'Bạn là Trợ lý ảo Hỗ trợ Thủ tục Hành chính công. Nhiệm vụ của bạn là hướng dẫn công dân chuẩn bị hồ sơ, giải đáp thắc mắc về quy trình, lệ phí và thời gian giải quyết một cách chính xác, lịch sự và căn cứ theo văn bản pháp luật hiện hành. Tuyệt đối không tư vấn các nội dung trái pháp luật.'
-        });
       }
     };
 
@@ -209,21 +197,35 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
   };
 
   const updateModelField = (id: string, field: keyof ModelConfig, value: string) => {
-    // Don't update the API key field since it's handled by environment variables
+    // Don't update API key field since it's handled by environment variables
     if (field === 'apiKey') {
       return;
     }
-    setModels(prev => prev.map(m => m.id === id ? { ...m, [field]: value } : m));
+    setModels(prev => {
+      const updated = prev.map(m => m.id === id ? { ...m, [field]: value } : m);
+      setHasUnsavedChanges(true);
+      return updated;
+    });
   };
 
   const toggleModelActive = (id: string) => {
-    setModels(prev => prev.map(m => m.id === id ? { ...m, isActive: !m.isActive } : m));
+    setModels(prev => {
+      const updated = prev.map(m => m.id === id ? { ...m, isActive: !m.isActive } : m);
+      setHasUnsavedChanges(true);
+      return updated;
+    });
   };
 
   const saveModels = async () => {
+    if (!hasUnsavedChanges) {
+      showToast('Không có thay đổi để lưu', 'info');
+      return;
+    }
+
     setSavingModels(true);
 
     try {
+      console.log('Saving models to server:', models);
       const response = await fetch('/api/models', {
         method: 'POST',
         headers: {
@@ -233,16 +235,23 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
       });
 
       const result = await response.json();
+      console.log('Save models response:', result);
 
       if (result.success) {
-        showToast('Đã lưu cấu hình AI.', 'success');
-        setLastSaved(new Date());
+        // Reload models from server to confirm save
+        const reloadSuccess = await loadModelsFromServer();
+        if (reloadSuccess) {
+          showToast('Đã lưu cấu hình AI thành công!', 'success');
+          setLastSaved(new Date());
+        } else {
+          showToast('Đã lưu nhưng không thể tải lại dữ liệu. Vui lòng tải lại trang.', 'warning');
+        }
       } else {
-        showToast('Lưu cấu hình AI thất bại.', 'error');
+        showToast(`Lưu cấu hình AI thất bại: ${result.error || 'Lỗi không xác định'}`, 'error');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving models:', error);
-      showToast('Lỗi kết nối máy chủ khi lưu cấu hình AI.', 'error');
+      showToast(`Lỗi kết nối máy chủ: ${error.message || 'Không thể lưu cấu hình'}`, 'error');
     } finally {
       setSavingModels(false);
     }
@@ -407,62 +416,108 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
     <div className="space-y-6">
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
             <div className="p-6 border-b border-slate-100">
-                <h3 className="text-lg font-bold text-slate-900">Nhà cung cấp Mô hình AI</h3>
-                <p className="text-slate-500 text-sm">Cấu hình API Key và chọn mô hình xử lý.</p>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-900">Nhà cung cấp Mô hình AI</h3>
+                        <p className="text-slate-500 text-sm">Cấu hình API Key và chọn mô hình xử lý.</p>
+                    </div>
+                    {loadingModels && (
+                        <div className="flex items-center gap-2 text-sm text-slate-500">
+                            <RefreshCw size={16} className="animate-spin" />
+                            Đang tải...
+                        </div>
+                    )}
+                </div>
             </div>
             <div className="divide-y divide-slate-100">
-                {models.map((model) => (
-                    <div key={model.id} className="p-6 flex flex-col md:flex-row items-start gap-6 hover:bg-slate-50 transition-colors">
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${model.isActive ? 'bg-blue-600' : 'bg-slate-100'}`}>
-                            <Cpu size={24} className={model.isActive ? 'text-white' : 'text-slate-400'} />
-                        </div>
-                        <div className="flex-1 space-y-3 w-full">
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <h4 className="font-bold text-slate-900 text-base">{model.name}</h4>
-                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide bg-slate-100 px-2 py-0.5 rounded border border-slate-200">{model.provider}</span>
-                                </div>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" className="sr-only peer" checked={model.isActive} onChange={() => toggleModelActive(model.id)} />
-                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                                </label>
+                {loadingModels && models.length === 0 ? (
+                    <div className="p-12 text-center">
+                        <RefreshCw size={32} className="animate-spin text-slate-300 mx-auto mb-4" />
+                        <p className="text-slate-500">Đang tải danh sách mô hình AI...</p>
+                    </div>
+                ) : models.length === 0 ? (
+                    <div className="p-12 text-center">
+                        <Cpu size={32} className="text-slate-300 mx-auto mb-4" />
+                        <p className="text-slate-500">Không tìm thấy mô hình nào</p>
+                    </div>
+                ) : (
+                    models.map((model) => (
+                        <div key={model.id} className="p-6 flex flex-col md:flex-row items-start gap-6 hover:bg-slate-50 transition-colors">
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${model.isActive ? 'bg-blue-600' : 'bg-slate-100'}`}>
+                                <Cpu size={24} className={model.isActive ? 'text-white' : 'text-slate-400'} />
                             </div>
-                            {model.isActive && (
-                                <div className="animate-in slide-in-from-top-2 grid grid-cols-1 gap-4">
-                                    <div className="space-y-1">
-                                         <label className="text-xs font-semibold text-slate-500">Mã Mô hình (Model ID)</label>
-                                         <input
-                                            type="text"
-                                            value={model.modelString}
-                                            onChange={(e) => updateModelField(model.id, 'modelString', e.target.value)}
-                                            placeholder="VD: gemini-1.5-pro, gpt-4o"
-                                            className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2 text-slate-800 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all shadow-sm"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-semibold text-slate-500">Khóa API</label>
-                                        <div className="w-full bg-slate-100 border border-slate-200 rounded-lg px-4 py-2 text-slate-500 text-sm italic">
-                                            Đã cấu hình từ biến môi trường
+                            <div className="flex-1 space-y-3 w-full">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h4 className="font-bold text-slate-900 text-base">{model.name}</h4>
+                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide bg-slate-100 px-2 py-0.5 rounded border border-slate-200">{model.provider}</span>
+                                            {model.isActive && (
+                                                <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-semibold border border-green-200 flex items-center gap-1">
+                                                    <Check size={10} /> Kích hoạt
+                                                </span>
+                                            )}
                                         </div>
-                                        <p className="text-xs text-slate-400 mt-1">Khóa API được lấy từ biến môi trường trên hệ thống</p>
                                     </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={model.isActive}
+                                            onChange={() => toggleModelActive(model.id)}
+                                        />
+                                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                    </label>
                                 </div>
-                            )}
+                                {model.isActive && (
+                                    <div className="animate-in slide-in-from-top-2 grid grid-cols-1 gap-4">
+                                        <div className="space-y-1">
+                                             <label className="text-xs font-semibold text-slate-500">Mã Mô hình (Model ID)</label>
+                                             <input
+                                                type="text"
+                                                value={model.modelString}
+                                                onChange={(e) => updateModelField(model.id, 'modelString', e.target.value)}
+                                                placeholder="VD: gemini-1.5-pro, gpt-4o"
+                                                className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2 text-slate-800 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all shadow-sm"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-slate-500">Khóa API</label>
+                                            <div className="w-full bg-slate-100 border border-slate-200 rounded-lg px-4 py-2 text-slate-500 text-sm italic">
+                                                Đã cấu hình từ biến môi trường
+                                            </div>
+                                            <p className="text-xs text-slate-400 mt-1">Khóa API được lấy từ biến môi trường trên hệ thống</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                ))}
-            </div>
-            <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-between">
-                {lastSaved && (
-                    <div className="text-xs text-slate-400 flex items-center gap-2">
-                        <Zap size={14} />
-                        Đã lưu lần cuối: {lastSaved.toLocaleTimeString('vi-VN')}
-                    </div>
+                    ))
                 )}
+            </div>
+            <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
+                <div className="flex items-center gap-4">
+                    {lastSaved && !hasUnsavedChanges && (
+                        <div className="text-xs text-slate-400 flex items-center gap-2">
+                            <Zap size={14} />
+                            Đã lưu lần cuối: {lastSaved.toLocaleTimeString('vi-VN')}
+                        </div>
+                    )}
+                    {hasUnsavedChanges && (
+                        <div className="text-xs text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200 flex items-center gap-2">
+                            <Zap size={14} className="text-amber-500" />
+                            Có thay đổi chưa lưu
+                        </div>
+                    )}
+                </div>
                 <button
                     onClick={saveModels}
-                    disabled={savingModels}
-                    className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold transition-all shadow-lg shadow-slate-900/20 flex items-center justify-center gap-2 active:scale-95"
+                    disabled={savingModels || !hasUnsavedChanges}
+                    className={`px-6 py-2.5 rounded-lg font-semibold transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95 ${
+                        hasUnsavedChanges && !savingModels
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20'
+                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    }`}
                 >
                     {savingModels ? <RefreshCw size={18} className="animate-spin" /> : <Save size={18} />}
                     Lưu Cấu hình
@@ -496,9 +551,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
                       {role.icon} {role.label}
                    </label>
                    <div className="relative">
-                      <select 
-                        value={roles[role.id as keyof typeof roles]} 
-                        onChange={(e) => setRoles(prev => ({ ...prev, [role.id]: e.target.value }))}
+                       <select
+                        value={roles[role.id as keyof typeof roles]}
+                        onChange={(e) => {
+                          setRoles(prev => {
+                            const updated = { ...prev, [role.id]: e.target.value };
+                            setHasUnsavedRoles(true);
+                            return updated;
+                          });
+                        }}
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-slate-800 appearance-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
                       >
                         {models.map(m => (
@@ -524,16 +585,40 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
                     <h3 className="text-lg font-bold text-slate-900">System Prompt</h3>
                     <p className="text-slate-500 text-sm">Chỉ thị cốt lõi cho AI.</p>
                 </div>
-                <div className="p-6 flex-1 flex flex-col">
-                    <textarea 
+                 <div className="p-6 flex-1 flex flex-col">
+                    <div className="relative mb-2">
+                      <textarea
                         value={roles.systemPrompt}
-                        onChange={(e) => setRoles({...roles, systemPrompt: e.target.value})}
+                        onChange={(e) => {
+                          setRoles(prev => {
+                            const updated = { ...prev, systemPrompt: e.target.value };
+                            setHasUnsavedRoles(true);
+                            return updated;
+                          });
+                        }}
                         className="flex-1 w-full bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm text-slate-800 leading-relaxed focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none resize-none min-h-[300px]"
                         placeholder="Nhập chỉ thị hệ thống..."
                     />
-                    <div className="mt-4 flex justify-end">
+                    {hasUnsavedRoles && (
+                      <div className="absolute -top-2 -right-2">
+                        <span className="inline-block w-3 h-3 bg-amber-500 rounded-full animate-pulse" title="Có thay đổi chưa lưu"></span>
+                      </div>
+                    )}
+                    </div>
+                    <div className="mt-4 flex justify-between items-center">
+                        {hasUnsavedRoles && (
+                          <span className="text-xs text-amber-600 flex items-center gap-1">
+                            <Zap size={12} /> Có thay đổi chưa lưu
+                          </span>
+                        )}
                         <button
                             onClick={async () => {
+                                if (!hasUnsavedRoles) {
+                                  showToast('Không có thay đổi để lưu', 'info');
+                                  return;
+                                }
+
+                                setSavingRoles(true);
                                 try {
                                     const response = await fetch('/api/roles', {
                                         method: 'POST',
@@ -546,20 +631,28 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
                                     const result = await response.json();
 
                                     if (result.success) {
-                                        showToast('Đã cập nhật System Prompt', 'success');
+                                        showToast('Đã lưu cấu hình Roles & System Prompt thành công!', 'success');
                                         setLastSaved(new Date());
+                                        setHasUnsavedRoles(false);
                                     } else {
-                                        showToast('Lưu System Prompt thất bại.', 'error');
+                                        showToast(`Lưu thất bại: ${result.error || 'Lỗi không xác định'}`, 'error');
                                     }
                                 } catch (error) {
                                     console.error('Error saving roles:', error);
-                                    showToast('Lỗi kết nối máy chủ khi lưu System Prompt.', 'error');
+                                    showToast('Lỗi kết nối máy chủ khi lưu cấu hình.', 'error');
+                                } finally {
+                                  setSavingRoles(false);
                                 }
                             }}
-                            className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/10 flex items-center gap-2"
+                            disabled={savingRoles || !hasUnsavedRoles}
+                            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-lg shadow-slate-900/10 flex items-center gap-2 ${
+                              hasUnsavedRoles && !savingRoles
+                              ? 'bg-slate-900 text-white hover:bg-slate-800'
+                              : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                            }`}
                         >
-                            <Save size={14} />
-                            Lưu Chỉ thị
+                            {savingRoles ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                            Lưu Cấu hình
                         </button>
                     </div>
                 </div>
