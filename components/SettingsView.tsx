@@ -718,23 +718,23 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
                       {role.icon} {role.label}
                    </label>
                    <div className="relative">
-                       <select
-                        value={roles[role.id as keyof typeof roles]}
-                        onChange={(e) => {
-                          setRoles(prev => {
-                            const updated = { ...prev, [role.id]: e.target.value };
-                            setHasUnsavedRoles(true);
-                            return updated;
-                          });
-                        }}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-slate-800 appearance-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                      >
-                        {models.map(m => (
-                            <option key={m.id} value={m.id} disabled={!m.isActive}>
-                                {m.name} {!m.isActive ? '(Chưa kích hoạt)' : ''}
-                            </option>
-                        ))}
-                      </select>
+                      <select
+                         value={roles[role.id as keyof typeof roles]}
+                         onChange={(e) => {
+                           setRoles(prev => {
+                             const updated = { ...prev, [role.id]: e.target.value };
+                             setHasUnsavedRoles(true);
+                             return updated;
+                           });
+                         }}
+                         className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-slate-800 appearance-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                       >
+                         {models.map(m => (
+                             <option key={m.id} value={m.id} disabled={!m.isActive && role.id !== 'rag'}>
+                                 {m.name} {!m.isActive ? '(Chưa kích hoạt)' : ''}
+                             </option>
+                         ))}
+                       </select>
                       <div className="absolute right-3 top-3 pointer-events-none text-slate-400">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                       </div>

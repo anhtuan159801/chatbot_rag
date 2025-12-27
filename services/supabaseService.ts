@@ -10,7 +10,7 @@ if (!connectionString) {
 
 let pgClient: Client | null = null;
 
-if (connectionString && connectionString !== 'postgresql://postgres.smtqevkyhttclmpwsmvc:[YOUR-PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres') {
+if (connectionString && !connectionString.includes('[YOUR-PASSWORD]')) {
   pgClient = new Client({
     connectionString: connectionString,
   });

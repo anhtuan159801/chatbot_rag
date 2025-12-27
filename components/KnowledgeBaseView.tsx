@@ -156,12 +156,31 @@ const KnowledgeBaseView: React.FC = () => {
     }
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
     if (window.confirm(`Xóa ${selectedIds.size} văn bản đã chọn?`)) {
-        setDocuments(prev => prev.filter(doc => !selectedIds.has(doc.id)));
-        setSelectedIds(new Set());
-        showToast('Đã xóa các văn bản được chọn.', 'info');
+        try {
+            const deletePromises = Array.from(selectedIds).map(async id => {
+                const response = await fetch(`/api/knowledge-base/${id}`, {
+                    method: 'DELETE'
+                });
+                return response.ok;
+            });
+
+            const results = await Promise.all(deletePromises);
+            const successCount = results.filter(r => r).length;
+
+            if (successCount === selectedIds.size) {
+                setDocuments(prev => prev.filter(doc => !selectedIds.has(doc.id)));
+                setSelectedIds(new Set());
+                showToast(`Đã xóa ${successCount} văn bản thành công.`, 'success');
+            } else {
+                showToast(`Đã xóa ${successCount}/${selectedIds.size} văn bản. Một số văn bản thất bại.`, 'warning');
+            }
+        } catch (error) {
+            console.error('Bulk delete error:', error);
+            showToast('Lỗi khi xóa văn bản', 'error');
+        }
     }
   };
 

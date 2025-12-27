@@ -61,8 +61,8 @@ router.post('/knowledge-base/upload', upload.single('file'), async (req, res) =>
       return res.status(500).json({ error: 'Database not connected' });
     }
 
-    // Generate unique document ID
-    const documentId = `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Generate unique document ID (valid UUID)
+    const documentId = crypto.randomUUID();
 
     // Insert document with PENDING status
     const result = await pgClient.query(
@@ -108,8 +108,8 @@ router.post('/knowledge-base/crawl', async (req, res) => {
       return res.status(500).json({ error: 'Database not connected' });
     }
 
-    // Generate unique document ID
-    const documentId = `crawl_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Generate unique document ID (valid UUID)
+    const documentId = crypto.randomUUID();
 
     // Insert document with PENDING status
     const result = await pgClient.query(
@@ -234,7 +234,7 @@ async function processDocumentAsync(documentId: string, name: string, file: Expr
     const embeddingModel = models.find(m => m.id === ragModelId);
 
     if (!embeddingModel) {
-      console.warn('No embedding model configured, skipping vectorization');
+      console.warn('No embedding model configured, using default HuggingFace model');
     }
 
     // Generate and store embeddings for each chunk
@@ -316,7 +316,7 @@ async function processWebPageAsync(documentId: string, url: string) {
     const embeddingModel = models.find(m => m.id === ragModelId);
 
     if (!embeddingModel) {
-      console.warn('No embedding model configured, skipping vectorization');
+      console.warn('No embedding model configured, using default HuggingFace model');
     }
 
     // Generate and store embeddings for each chunk
