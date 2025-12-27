@@ -422,13 +422,26 @@ async function generateEmbedding(text: string, embeddingModel?: any): Promise<nu
       })
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[EMBEDDING] ✗ API Error:', response.status, response.statusText);
+      console.error('[EMBEDDING] ✗ API Response Body:', errorText);
+
+      if (response.status === 404) {
+        console.error('[EMBEDDING] ✗ CRITICAL: Model not found on HuggingFace!');
+        console.error('[EMBEDDING] ✗ Please check model_string in database or use correct model ID');
+      }
+
+      return null;
+    }
+
     const data = await response.json();
 
-    if (response.ok && Array.isArray(data)) {
+    if (Array.isArray(data)) {
       console.log(`[EMBEDDING] ✓ Success - embedding dimension: ${data[0].length}`);
       return data[0];
     } else {
-      console.error('[EMBEDDING] ✗ API Error:', response.status, response.statusText);
+      console.error('[EMBEDDING] ✗ Invalid response format - expected array');
       console.error('[EMBEDDING] ✗ API Response:', data);
       return null;
     }

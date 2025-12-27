@@ -492,8 +492,8 @@ export const initializeAiModels = async (): Promise<void> => {
       {
         id: 'hf-2',
         provider: 'huggingface',
-        name: 'Google Gemma (HuggingFace)',
-        model_string: 'google/gemma-3-300m',
+        name: 'BGE Small Embedding',
+        model_string: 'BAAI/bge-small-en-v1.5',
         api_key: process.env.HUGGINGFACE_API_KEY || '',
         is_active: false
       }
