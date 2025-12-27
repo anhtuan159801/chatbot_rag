@@ -17,8 +17,8 @@ COPY . .
 # Build the frontend first (creates dist folder)
 RUN npm run build
 
-# Compile server-side TypeScript files to JavaScript (creates dist-server folder)
-RUN npx tsc --project tsconfig.server.json
+# Force rebuild server-side TypeScript files (no cache for JS files)
+RUN rm -rf dist-server && npx tsc --project tsconfig.server.json
 
 # Create production environment file if not exists
 RUN if [ ! -f .env ]; then touch .env; fi
