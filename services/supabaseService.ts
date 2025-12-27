@@ -331,34 +331,65 @@ export const updateAiRoles = async (roles: Record<string, string>): Promise<bool
   }
 
   try {
+    console.log('=== Starting updateAiRoles transaction ===');
+    console.log('Roles to update:', JSON.stringify(roles, null, 2));
+
     // Begin transaction
     await pgClient.query('BEGIN');
 
+    // Get all available models to validate foreign key constraints
+    const modelsResult = await pgClient.query('SELECT id FROM ai_models');
+    const availableModelIds = modelsResult.rows.map((r: any) => r.id);
+    console.log('Available model IDs:', availableModelIds);
+
     // First, delete all existing role assignments
     await pgClient.query('DELETE FROM ai_role_assignments');
+    console.log('Deleted all existing role assignments');
 
-    // Then insert the new role assignments
+    // Then insert new role assignments (only for valid models)
     const roleEntries = Object.entries(roles);
+    let insertedCount = 0;
+    let skippedCount = 0;
+
     if (roleEntries.length > 0) {
       for (const [roleKey, modelId] of roleEntries) {
+        // Validate that the model exists before inserting
+        if (!availableModelIds.includes(modelId)) {
+          console.warn(`⚠️ Skipping role '${roleKey}' - model ID '${modelId}' does not exist`);
+          skippedCount++;
+          continue;
+        }
+
+        console.log(`Inserting role '${roleKey}' with model '${modelId}'`);
         await pgClient.query(
           'INSERT INTO ai_role_assignments (role_key, model_id) VALUES ($1, $2)',
           [roleKey, modelId]
         );
+        insertedCount++;
       }
     }
+
+    console.log(`✓ Inserted ${insertedCount} role assignments, skipped ${skippedCount} invalid references`);
+    console.log('=== updateAiRoles transaction completed successfully ===');
 
     // Commit transaction
     await pgClient.query('COMMIT');
 
     return true;
-  } catch (error) {
-    console.error('Error updating AI role assignments:', error);
+  } catch (error: any) {
+    console.error('=== Error updating AI role assignments ===');
+    console.error('Error details:', error);
+    console.error('Error message:', error?.message);
+    console.error('Error code:', error?.code);
+
+    // Rollback transaction
     try {
       await pgClient.query('ROLLBACK');
+      console.log('Transaction rolled back due to error');
     } catch (rollbackError) {
       console.error('Error rolling back transaction:', rollbackError);
     }
+
     return false;
   }
 };

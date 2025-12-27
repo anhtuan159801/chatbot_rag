@@ -101,7 +101,29 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
         const response = await fetch('/api/roles');
         if (response.ok) {
           const serverRoles = await response.json();
-          setRoles(serverRoles);
+          console.log('Loaded roles from server:', serverRoles);
+
+          // Filter out roles that reference non-existent models
+          const validRoles: any = {};
+          const modelIds = models.map(m => m.id);
+
+          Object.keys(serverRoles).forEach(key => {
+            if (key === 'systemPrompt') {
+              // Keep systemPrompt as-is
+              validRoles[key] = serverRoles[key];
+            } else {
+              // Only keep role if its model_id exists in models list
+              const modelId = serverRoles[key];
+              if (modelIds.includes(modelId)) {
+                validRoles[key] = modelId;
+              } else {
+                console.warn(`⚠️ Role '${key}' references non-existent model '${modelId}'. Skipping.`);
+              }
+            }
+          });
+
+          console.log('Valid roles after filtering:', validRoles);
+          setRoles(validRoles);
           setHasUnsavedRoles(false);
         } else {
           // Fallback to default roles if API call fails
@@ -113,7 +135,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
     };
 
     loadRoles();
-  }, []);
+  }, [models]); // Reload roles when models change to handle deleted models
 
   // --- Chat Test State ---
   const [testMessages, setTestMessages] = useState<{role: 'user' | 'bot', text: string}[]>([
