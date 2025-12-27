@@ -46,10 +46,10 @@ CREATE TABLE IF NOT EXISTS knowledge_chunks (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Table for storing AI role assignments
+ -- Table for storing AI role assignments
 CREATE TABLE IF NOT EXISTS ai_role_assignments (
     role_key TEXT PRIMARY KEY,
-    model_id TEXT REFERENCES ai_models(id),
+    model_id TEXT REFERENCES ai_models(id) ON DELETE CASCADE,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
