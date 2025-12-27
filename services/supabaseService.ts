@@ -144,7 +144,7 @@ export const getModels = async (): Promise<AiModel[]> => {
 };
 
 /**
- * Update AI models in the database
+ * Update AI models in database
  */
 export const updateModels = async (models: AiModel[]): Promise<{ success: boolean; error?: string }> => {
   if (!pgClient) {
@@ -161,57 +161,86 @@ export const updateModels = async (models: AiModel[]): Promise<{ success: boolea
     // Begin transaction
     await client.query('BEGIN');
 
-    // First, delete all existing models
-    const deleteResult = await client.query('DELETE FROM ai_models');
-    console.log(`Deleted ${deleteResult.rowCount} existing models`);
+    // Get existing model IDs
+    const existingModels = await client.query('SELECT id FROM ai_models');
+    const existingIds = existingModels.rows.map((r: any) => r.id);
+    const newIds = models.map(m => m.id);
 
-    // Then insert the new models
-    if (models.length > 0) {
-      for (const model of models) {
-        console.log(`Processing model: ${model.id} - ${model.name}`);
+    // Find models to delete (exist in DB but not in new list)
+    const idsToDelete = existingIds.filter((id: string) => !newIds.includes(id));
 
-        // Validate required fields
-        if (!model.id || !model.provider || !model.name || !model.model_string) {
-          console.error('Invalid model data:', model);
-          throw new Error(`Invalid model data for ${model.name}: missing required fields`);
-        }
+    // Delete role assignments for models that will be removed
+    if (idsToDelete.length > 0) {
+      await client.query(
+        'DELETE FROM ai_role_assignments WHERE model_id = ANY($1)',
+        [idsToDelete]
+      );
+      console.log(`Deleted role assignments for models: ${idsToDelete.join(', ')}`);
+    }
 
-        // Validate provider
-        const validProviders = ['gemini', 'openai', 'openrouter', 'huggingface'];
-        if (!validProviders.includes(model.provider.toLowerCase())) {
-          throw new Error(`Invalid provider: ${model.provider}`);
-        }
+    // Delete old models
+    if (idsToDelete.length > 0) {
+      const deleteResult = await client.query(
+        'DELETE FROM ai_models WHERE id = ANY($1)',
+        [idsToDelete]
+      );
+      console.log(`Deleted ${deleteResult.rowCount} models that are no longer in the list`);
+    }
 
-        // Use API key from environment variable
-        // The UI no longer sends API keys, so we always use environment variables
-        let apiKey = '';
-        switch (model.provider.toLowerCase()) {
-          case 'gemini':
-            apiKey = process.env.GEMINI_API_KEY || '';
-            if (!apiKey) console.warn(`Warning: GEMINI_API_KEY not set for ${model.name}`);
-            break;
-          case 'openai':
-            apiKey = process.env.OPENAI_API_KEY || '';
-            if (!apiKey) console.warn(`Warning: OPENAI_API_KEY not set for ${model.name}`);
-            break;
-          case 'openrouter':
-            apiKey = process.env.OPENROUTER_API_KEY || '';
-            if (!apiKey) console.warn(`Warning: OPENROUTER_API_KEY not set for ${model.name}`);
-            break;
-          case 'huggingface':
-            apiKey = process.env.HUGGINGFACE_API_KEY || '';
-            if (!apiKey) console.warn(`Warning: HUGGINGFACE_API_KEY not set for ${model.name}`);
-            break;
-          default:
-            apiKey = '';
-        }
+    // Insert or update each model
+    for (const model of models) {
+      console.log(`Processing model: ${model.id} - ${model.name}`);
 
-        const insertResult = await client.query(
-          'INSERT INTO ai_models (id, provider, name, model_string, api_key, is_active) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
-          [model.id, model.provider, model.name, model.model_string, apiKey, model.is_active]
-        );
-        console.log(`✓ Inserted model: ${model.name} (ID: ${model.id}, Active: ${model.is_active})`);
+      // Validate required fields
+      if (!model.id || !model.provider || !model.name || !model.model_string) {
+        console.error('Invalid model data:', model);
+        throw new Error(`Invalid model data for ${model.name}: missing required fields`);
       }
+
+      // Validate provider
+      const validProviders = ['gemini', 'openai', 'openrouter', 'huggingface'];
+      if (!validProviders.includes(model.provider.toLowerCase())) {
+        throw new Error(`Invalid provider: ${model.provider}`);
+      }
+
+      // Use API key from environment variable
+      // The UI no longer sends API keys, so we always use environment variables
+      let apiKey = '';
+      switch (model.provider.toLowerCase()) {
+        case 'gemini':
+          apiKey = process.env.GEMINI_API_KEY || '';
+          if (!apiKey) console.warn(`Warning: GEMINI_API_KEY not set for ${model.name}`);
+          break;
+        case 'openai':
+          apiKey = process.env.OPENAI_API_KEY || '';
+          if (!apiKey) console.warn(`Warning: OPENAI_API_KEY not set for ${model.name}`);
+          break;
+        case 'openrouter':
+          apiKey = process.env.OPENROUTER_API_KEY || '';
+          if (!apiKey) console.warn(`Warning: OPENROUTER_API_KEY not set for ${model.name}`);
+          break;
+        case 'huggingface':
+          apiKey = process.env.HUGGINGFACE_API_KEY || '';
+          if (!apiKey) console.warn(`Warning: HUGGINGFACE_API_KEY not set for ${model.name}`);
+          break;
+        default:
+          apiKey = '';
+      }
+
+      // Use UPSERT (INSERT ... ON CONFLICT DO UPDATE)
+      const upsertResult = await client.query(
+        `INSERT INTO ai_models (id, provider, name, model_string, api_key, is_active)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (id) DO UPDATE SET
+           provider = EXCLUDED.provider,
+           name = EXCLUDED.name,
+           model_string = EXCLUDED.model_string,
+           api_key = EXCLUDED.api_key,
+           is_active = EXCLUDED.is_active
+         RETURNING id`,
+        [model.id, model.provider, model.name, model.model_string, apiKey, model.is_active]
+      );
+      console.log(`✓ Upserted model: ${model.name} (ID: ${model.id}, Active: ${model.is_active})`);
     }
 
     // Commit transaction
