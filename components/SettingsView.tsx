@@ -3,7 +3,7 @@ import {
     Facebook, Save, Copy, CheckCircle, RefreshCw,
     Shield, ExternalLink, Link, Check, Cpu, Layers, MessageSquare,
     Play, Send, Bot, User, Image as ImageIcon, Headphones, Database, Activity,
-    ArrowLeft, Settings as SettingsIcon, Zap, Server, Eye, EyeOff
+    ArrowLeft, Settings as SettingsIcon, Zap, Server, Eye, EyeOff, Trash2
 } from 'lucide-react';
 import { useToast } from './Toast';
 
@@ -206,6 +206,43 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
       setHasUnsavedChanges(true);
       return updated;
     });
+  };
+
+  const deleteModel = (id: string) => {
+    if (confirm('Bạn có chắc chắn muốn xóa model này?')) {
+      setModels(prev => {
+        const updated = prev.filter(m => m.id !== id);
+        setHasUnsavedChanges(true);
+        return updated;
+      });
+    }
+  };
+
+  const addNewModel = () => {
+    // Generate a unique ID for the new model
+    const provider = newModel.provider || 'huggingface';
+    const timestamp = Date.now();
+    const id = `${provider}-${timestamp}`;
+
+    const modelToAdd: ModelConfig = {
+      id,
+      provider: provider as any,
+      name: newModel.name || 'New Model',
+      modelString: newModel.modelString || '',
+      apiKey: '',
+      isActive: false
+    };
+
+    setModels(prev => [...prev, modelToAdd]);
+    setShowAddModel(false);
+    setNewModel({
+      provider: 'huggingface',
+      name: '',
+      modelString: '',
+      isActive: false
+    });
+    setHasUnsavedChanges(true);
+    showToast('Đã thêm model mới. Hãy lưu cấu hình!', 'success');
   };
 
   const toggleModelActive = (id: string) => {
@@ -429,6 +466,91 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
                     )}
                 </div>
             </div>
+
+            {/* Add New Model Form */}
+            {showAddModel && (
+                <div className="p-6 bg-slate-50 border-b border-slate-200">
+                    <div className="flex justify-between items-center mb-4">
+                        <h4 className="font-bold text-slate-900">Thêm Mô hình Mới</h4>
+                        <button
+                            onClick={() => setShowAddModel(false)}
+                            className="text-slate-400 hover:text-slate-600 transition-colors"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold text-slate-700">Nhà cung cấp</label>
+                            <select
+                                value={newModel.provider}
+                                onChange={(e) => setNewModel({...newModel, provider: e.target.value as any})}
+                                className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-slate-800 appearance-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                            >
+                                <option value="gemini">Google Gemini</option>
+                                <option value="openai">OpenAI</option>
+                                <option value="openrouter">OpenRouter</option>
+                                <option value="huggingface">Hugging Face</option>
+                            </select>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold text-slate-700">Tên Model</label>
+                            <input
+                                type="text"
+                                value={newModel.name}
+                                onChange={(e) => setNewModel({...newModel, name: e.target.value})}
+                                placeholder="VD: Llama 3.1 70B"
+                                className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-slate-800 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all shadow-sm"
+                            />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                            <label className="text-sm font-semibold text-slate-700">Mã Mô hình (Model ID)</label>
+                            <input
+                                type="text"
+                                value={newModel.modelString}
+                                onChange={(e) => setNewModel({...newModel, modelString: e.target.value})}
+                                placeholder="VD: meta-llama/Llama-3.1-70B-Instruct, qwen/qwen-72b-chat"
+                                className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-slate-800 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all shadow-sm"
+                            />
+                            <p className="text-xs text-slate-400">ID model được lấy từ HuggingFace Hub hoặc OpenRouter</p>
+                        </div>
+                    </div>
+                    <div className="mt-4 flex justify-end gap-2">
+                        <button
+                            onClick={() => {
+                                setShowAddModel(false);
+                                setNewModel({ provider: 'huggingface', name: '', modelString: '', isActive: false });
+                            }}
+                            className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
+                        >
+                            Hủy
+                        </button>
+                        <button
+                            onClick={addNewModel}
+                            disabled={!newModel.name || !newModel.modelString}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                newModel.name && newModel.modelString
+                                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                            }`}
+                        >
+                            Thêm Model
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {!showAddModel && (
+                <div className="p-4 border-b border-slate-100">
+                    <button
+                        onClick={() => setShowAddModel(true)}
+                        className="w-full px-4 py-3 bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl text-slate-600 font-medium hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition-all flex items-center justify-center gap-2"
+                    >
+                        <Cpu size={20} />
+                        Thêm Mô hình AI Mới
+                    </button>
+                </div>
+            )}
             <div className="divide-y divide-slate-100">
                 {loadingModels && models.length === 0 ? (
                     <div className="p-12 text-center">
@@ -459,15 +581,24 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
                                             )}
                                         </div>
                                     </div>
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            className="sr-only peer"
-                                            checked={model.isActive}
-                                            onChange={() => toggleModelActive(model.id)}
-                                        />
-                                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                                    </label>
+                                    <div className="flex items-center gap-3">
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only peer"
+                                                checked={model.isActive}
+                                                onChange={() => toggleModelActive(model.id)}
+                                            />
+                                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                        </label>
+                                        <button
+                                            onClick={() => deleteModel(model.id)}
+                                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                            title="Xóa model"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </div>
                                 </div>
                                 {model.isActive && (
                                     <div className="animate-in slide-in-from-top-2 grid grid-cols-1 gap-4">
