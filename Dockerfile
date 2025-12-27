@@ -5,6 +5,10 @@ WORKDIR /app
 # Install build dependencies for alpine
 RUN apk add --no-cache python3 make g++
 
+# Install all dependencies (both production and development) for building (no cache)
+# This also invalidates npm package cache
+RUN apk add --no-cache npm
+
 # Copy package files
 COPY package*.json ./
 
