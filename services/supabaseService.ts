@@ -94,7 +94,20 @@ export const updateConfig = async (key: string, value: any): Promise<boolean> =>
   }
 
   try {
-    console.log(`updateConfig called for key: '${key}', value length: ${typeof value === 'string' ? value.length : 'N/A'}`);
+    console.log(`updateConfig called for key: '${key}', value type: ${typeof value}`);
+
+    // Convert value to JSON format if it's a string (for system_prompt)
+    // The value column is JSONB type, so we need to ensure it's valid JSON
+    let jsonValue;
+    if (typeof value === 'string') {
+      // For strings, we store them as JSON strings (double quoted)
+      jsonValue = JSON.stringify(value);
+    } else {
+      // For objects, they should already be JSON-compatible
+      jsonValue = JSON.stringify(value);
+    }
+
+    console.log(`Converted to JSON length: ${jsonValue.length}`);
 
     // Check if config key exists
     const checkResult = await pgClient.query(
@@ -109,16 +122,16 @@ export const updateConfig = async (key: string, value: any): Promise<boolean> =>
       // Update existing record
       console.log(`Updating existing config '${key}'...`);
       result = await pgClient.query(
-        'UPDATE system_configs SET value = $1, updated_at = $2 WHERE key = $3',
-        [value, new Date().toISOString(), key]
+        'UPDATE system_configs SET value = $1::jsonb, updated_at = $2 WHERE key = $3',
+        [jsonValue, new Date().toISOString(), key]
       );
       console.log(`Update result for '${key}':`, result);
     } else {
       // Insert new record
       console.log(`Inserting new config '${key}'...`);
       result = await pgClient.query(
-        'INSERT INTO system_configs (key, value, updated_at) VALUES ($1, $2, $3)',
-        [key, value, new Date().toISOString()]
+        'INSERT INTO system_configs (key, value, updated_at) VALUES ($1, $2::jsonb, $3)',
+        [key, jsonValue, new Date().toISOString()]
       );
       console.log(`Insert result for '${key}':`, result);
     }
