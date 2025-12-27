@@ -21,7 +21,8 @@ export class StorageService {
     this.uploadsDir = path.join(__dirname, '..', 'uploads');
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    this.useSupabaseStorage = !!(supabaseUrl && supabaseKey);
+
+    this.useSupabaseStorage = this.isValidSupabaseConfig(supabaseUrl, supabaseKey);
 
     if (this.useSupabaseStorage) {
       this.supabase = createClient(
@@ -35,6 +36,18 @@ export class StorageService {
     }
   }
 
+  private isValidSupabaseConfig(url?: string, key?: string): boolean {
+    if (!url || !key) {
+      return false;
+    }
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl.match(/^https?:\/\//i)) {
+      console.warn('Invalid SUPABASE_URL format, falling back to local storage');
+      return false;
+    }
+    return true;
+  }
+
   private ensureUploadsDirectory() {
     fs.ensureDirSync(this.uploadsDir);
   }
@@ -43,10 +56,7 @@ export class StorageService {
     const ext = path.extname(file.originalname);
     const filename = `${documentId}${ext}`;
 
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (supabaseUrl && supabaseKey && this.supabase) {
+    if (this.useSupabaseStorage && this.supabase) {
       return this.saveToSupabase(file, filename);
     } else {
       return this.saveToLocal(file, filename);
