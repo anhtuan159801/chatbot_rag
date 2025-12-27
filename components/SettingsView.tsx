@@ -240,6 +240,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
     }
   };
 
+  const saveButtonRef = React.useRef<HTMLButtonElement>(null);
+
   const addNewModel = () => {
     // Generate a unique ID for the new model
     const provider = newModel.provider || 'huggingface';
@@ -264,7 +266,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
       isActive: false
     });
     setHasUnsavedChanges(true);
-    showToast('Đã thêm model mới. Hãy lưu cấu hình!', 'success');
+
+    // Auto-scroll to save button and highlight it
+    setTimeout(() => {
+      saveButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      saveButtonRef.current?.classList.add('animate-pulse', 'ring-4', 'ring-blue-500');
+      setTimeout(() => {
+        saveButtonRef.current?.classList.remove('animate-pulse', 'ring-4', 'ring-blue-500');
+      }, 3000);
+    }, 100);
+
+    showToast('✅ Đã thêm model mới! Hãy cuộn xuống và click nút "Lưu Cấu hình" để lưu.', 'success');
   };
 
   const toggleModelActive = (id: string) => {
@@ -556,7 +568,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
                                 : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                             }`}
                         >
-                            Thêm Model
+                            <Save size={14} className="mr-1.5" />
+                            Thêm & Lưu Model
                         </button>
                     </div>
                 </div>
@@ -664,6 +677,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
                     )}
                 </div>
                 <button
+                    ref={saveButtonRef}
                     onClick={saveModels}
                     disabled={savingModels || !hasUnsavedChanges}
                     className={`px-6 py-2.5 rounded-lg font-semibold transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95 ${
