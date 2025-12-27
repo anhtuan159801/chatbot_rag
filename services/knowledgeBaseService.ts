@@ -76,7 +76,7 @@ router.post('/knowledge-base/upload', upload.single('file'), async (req, res) =>
 
     // Start async processing (extract text, chunk, embed, store)
     processDocumentAsync(documentId, documentName, req.file).catch(err => {
-      console.error('Error processing document:', err);
+      console.error('ERROR processing document:', err);
       updateDocumentStatus(documentId, 'FAILED');
     });
 
@@ -177,31 +177,36 @@ router.delete('/knowledge-base/:id', async (req, res) => {
 // Async function to process uploaded document (extract, chunk, embed, store)
 async function processDocumentAsync(documentId: string, name: string, file: Express.Multer.File) {
   try {
-    console.log(`Starting processing for document: ${name} (${documentId})`);
+    console.log(`[PROCESSING] Starting for document: ${name} (${documentId})`);
+
+    if (!pgClient) {
+      console.error('[PROCESSING] ERROR: pgClient is null, cannot process document');
+      throw new Error('Database connection not available');
+    }
 
     // Update status to PROCESSING
     await updateDocumentStatus(documentId, 'PROCESSING');
-    console.log(`Status updated to PROCESSING for: ${name}`);
+    console.log(`[PROCESSING] Status updated to PROCESSING for: ${name}`);
 
     // Save file to storage
     const storedFile = await storageService.saveFile(file, documentId);
-    console.log(`File saved to storage: ${storedFile.url}`);
+    console.log(`[PROCESSING] File saved to storage: ${storedFile.url}`);
 
     // Update content_url in database
-    if (pgClient) {
-      await pgClient.query(
-        'UPDATE knowledge_base SET content_url = $1 WHERE id = $2',
-        [storedFile.url, documentId]
-      );
-    }
+    await pgClient.query(
+      'UPDATE knowledge_base SET content_url = $1 WHERE id = $2',
+      [storedFile.url, documentId]
+    );
+    console.log(`[PROCESSING] Database updated with content_url`);
 
     // Get local file path for extraction
     const filePath = await storageService.getLocalFilePath(storedFile.path);
+    console.log(`[PROCESSING] Getting local file path: ${filePath}`);
 
     // Extract text from file
-    console.log(`Extracting text from file...`);
+    console.log(`[PROCESSING] Extracting text from file...`);
     const extractedText = await textExtractorService.extractFromFile(filePath);
-    console.log(`Extracted ${extractedText.metadata.words} words from document`);
+    console.log(`[PROCESSING] Extracted ${extractedText.metadata.words} words from document`);
 
     if (extractedText.text.trim().length === 0) {
       throw new Error('No text extracted from file');
@@ -209,7 +214,7 @@ async function processDocumentAsync(documentId: string, name: string, file: Expr
 
     // Update status to VECTORIZING
     await updateDocumentStatus(documentId, 'VECTORIZING');
-    console.log(`Status updated to VECTORIZING for: ${name}`);
+    console.log(`[PROCESSING] Status updated to VECTORIZING for: ${name}`);
 
     // Chunk text using chunking service
     const chunks = chunkingService.chunk(extractedText.text, {
@@ -225,7 +230,7 @@ async function processDocumentAsync(documentId: string, name: string, file: Expr
       words: extractedText.metadata.words
     });
 
-    console.log(`Generated ${chunksWithMetadata.length} chunks for: ${name}`);
+    console.log(`[PROCESSING] Generated ${chunksWithMetadata.length} chunks for: ${name}`);
 
     // Get the configured embedding model from database
     const roles = await getAiRoles();
@@ -234,7 +239,9 @@ async function processDocumentAsync(documentId: string, name: string, file: Expr
     const embeddingModel = models.find(m => m.id === ragModelId);
 
     if (!embeddingModel) {
-      console.warn('No embedding model configured, using default HuggingFace model');
+      console.warn('[PROCESSING] No embedding model configured, using default HuggingFace model');
+    } else {
+      console.log(`[PROCESSING] Using embedding model: ${embeddingModel.name} (${embeddingModel.model_string})`);
     }
 
     // Generate and store embeddings for each chunk
@@ -255,19 +262,23 @@ async function processDocumentAsync(documentId: string, name: string, file: Expr
             ]
           );
           successCount++;
-          console.log(`Stored chunk ${i + 1}/${chunksWithMetadata.length} for: ${name}`);
+          console.log(`[PROCESSING] ✓ Stored chunk ${i + 1}/${chunksWithMetadata.length} for: ${name}`);
+        } else {
+          console.warn(`[PROCESSING] ⚠ Failed to generate embedding for chunk ${i + 1}`);
         }
       } catch (chunkError) {
-        console.error(`Error processing chunk ${i}:`, chunkError);
+        console.error(`[PROCESSING] ✗ Error processing chunk ${i + 1}:`, chunkError);
       }
     }
 
     // Update status to COMPLETED
     await updateDocumentStatus(documentId, 'COMPLETED', successCount);
-    console.log(`Document ${name} processed successfully with ${successCount} chunks`);
+    console.log(`[PROCESSING] ✓✓✓ Document ${name} processed successfully with ${successCount} chunks ✓✓✓`);
 
   } catch (error) {
-    console.error('Error in processDocumentAsync:', error);
+    console.error('[PROCESSING] ✗✗✗ ERROR in processDocumentAsync ✗✗✗');
+    console.error('[PROCESSING] Error details:', error);
+    console.error('[PROCESSING] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     await updateDocumentStatus(documentId, 'FAILED');
   }
 }
@@ -356,7 +367,10 @@ async function processWebPageAsync(documentId: string, url: string) {
 
 // Helper function to update document status
 async function updateDocumentStatus(documentId: string, status: string, vectorCount: number | null = null) {
-  if (!pgClient) return;
+  if (!pgClient) {
+    console.error('[UPDATE STATUS] ERROR: pgClient is null, cannot update status');
+    return;
+  }
 
   const query = vectorCount !== null
     ? 'UPDATE knowledge_base SET status = $1, vector_count = $2 WHERE id = $3'
@@ -364,7 +378,12 @@ async function updateDocumentStatus(documentId: string, status: string, vectorCo
 
   const params = vectorCount !== null ? [status, vectorCount, documentId] : [status, documentId];
 
-  await pgClient.query(query, params);
+  try {
+    await pgClient.query(query, params);
+    console.log(`[UPDATE STATUS] ${documentId} -> ${status} ${vectorCount !== null ? `(vectors: ${vectorCount})` : ''}`);
+  } catch (error) {
+    console.error('[UPDATE STATUS] ERROR updating status:', error);
+  }
 }
 
 // Helper function to generate embedding using configured model
@@ -380,7 +399,7 @@ async function generateEmbedding(text: string, embeddingModel?: any): Promise<nu
     }
 
     if (!apiKey) {
-      console.warn('No API key available, returning null embedding');
+      console.error('[EMBEDDING] ERROR: No HUGGINGFACE_API_KEY found in environment variables');
       return null;
     }
 
@@ -389,6 +408,8 @@ async function generateEmbedding(text: string, embeddingModel?: any): Promise<nu
     } else {
       apiUrl = 'https://router.huggingface.co/models/Qwen/Qwen3-Embedding-0.6B';
     }
+
+    console.log(`[EMBEDDING] Requesting embedding from: ${apiUrl}`);
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -404,13 +425,15 @@ async function generateEmbedding(text: string, embeddingModel?: any): Promise<nu
     const data = await response.json();
 
     if (response.ok && Array.isArray(data)) {
+      console.log(`[EMBEDDING] ✓ Success - embedding dimension: ${data[0].length}`);
       return data[0];
     } else {
-      console.error('HuggingFace API error:', data);
+      console.error('[EMBEDDING] ✗ API Error:', response.status, response.statusText);
+      console.error('[EMBEDDING] ✗ API Response:', data);
       return null;
     }
   } catch (error) {
-    console.error('Error generating embedding:', error);
+    console.error('[EMBEDDING] ✗ Exception:', error);
     return null;
   }
 }
