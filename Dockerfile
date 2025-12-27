@@ -11,6 +11,9 @@ COPY package*.json ./
 # Install all dependencies (both production and development) for building
 RUN npm ci
 
+# Ensure fresh TypeScript build every time
+RUN rm -rf dist-server node_modules/.vite
+
 # Copy source code
 COPY . .
 
