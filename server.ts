@@ -13,6 +13,7 @@ import {
   updateAiRoles,
   initializeSystemData
 } from './services/supabaseService.js';
+import pgClient from './services/supabaseService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -253,6 +254,32 @@ app.post('/api/roles', async (req, res) => {
   } catch (error) {
     console.error('Error updating AI roles:', error);
     res.status(500).json({ error: 'Failed to update AI roles and system prompt' });
+  }
+});
+
+// Fix embedding models in database
+app.post('/api/fix-embedding-models', async (req, res) => {
+  try {
+    console.log('Fixing embedding models in database...');
+
+    const result = await pgClient?.query(
+      `UPDATE ai_models 
+       SET model_string = 'BAAI/bge-small-en-v1.5'
+       WHERE id = 'hf-embed-1'`
+    );
+
+    if (result) {
+      console.log('✓ Fixed hf-embed-1 model to BAAI/bge-small-en-v1.5');
+      res.json({ 
+        success: true, 
+        message: 'Fixed embedding model to BAAI/bge-small-en-v1.5' 
+      });
+    } else {
+      throw new Error('Failed to update model');
+    }
+  } catch (error) {
+    console.error('Error fixing embedding models:', error);
+    res.status(500).json({ error: 'Failed to fix embedding models' });
   }
 });
 

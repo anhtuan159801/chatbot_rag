@@ -373,7 +373,7 @@ async function updateDocumentStatus(documentId: string, status: string, vectorCo
   }
 
   const query = vectorCount !== null
-    ? 'UPDATE knowledge_base SET status = $1, vector_count = $2::integer WHERE id = $3'
+    ? 'UPDATE knowledge_base SET status = $1, vector_count = CAST($2 AS integer) WHERE id = $3'
     : 'UPDATE knowledge_base SET status = $1 WHERE id = $3';
 
   const params = vectorCount !== null ? [status, vectorCount, documentId] : [status, documentId];
