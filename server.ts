@@ -194,7 +194,30 @@ app.post('/api/roles', async (req, res) => {
   try {
     const { chatbotText, chatbotVision, chatbotAudio, rag, analysis, sentiment, systemPrompt } = req.body;
 
-    // Update AI roles in Supabase
+    console.log('Received /api/roles request:', {
+      hasChatbotText: chatbotText !== undefined,
+      hasChatbotVision: chatbotVision !== undefined,
+      hasChatbotAudio: chatbotAudio !== undefined,
+      hasRag: rag !== undefined,
+      hasAnalysis: analysis !== undefined,
+      hasSentiment: sentiment !== undefined,
+      hasSystemPrompt: systemPrompt !== undefined,
+      systemPromptLength: systemPrompt?.length
+    });
+
+    // Update system prompt if provided
+    if (systemPrompt !== undefined) {
+      console.log('Updating system_prompt in database...');
+      const promptSuccess = await updateConfig('system_prompt', systemPrompt);
+      if (!promptSuccess) {
+        console.error('Failed to update system_prompt in database');
+        res.status(500).json({ error: 'Failed to update system prompt' });
+        return;
+      }
+      console.log('system_prompt updated successfully');
+    }
+
+    // Update AI roles in Supabase (only if any role values are provided)
     const rolesToUpdate: Record<string, string> = {};
     if (chatbotText !== undefined) rolesToUpdate.chatbotText = chatbotText;
     if (chatbotVision !== undefined) rolesToUpdate.chatbotVision = chatbotVision;
@@ -205,24 +228,18 @@ app.post('/api/roles', async (req, res) => {
 
     // Update roles if any need updating
     if (Object.keys(rolesToUpdate).length > 0) {
+      console.log('Updating roles:', rolesToUpdate);
       // Get existing roles and update with new values
       const existingRoles = await getAiRoles();
       const updatedRoles = { ...existingRoles, ...rolesToUpdate };
 
       const rolesSuccess = await updateAiRoles(updatedRoles);
       if (!rolesSuccess) {
+        console.error('Failed to update roles in database');
         res.status(500).json({ error: 'Failed to update AI roles' });
         return;
       }
-    }
-
-    // Update system prompt if provided
-    if (systemPrompt !== undefined) {
-      const promptSuccess = await updateConfig('system_prompt', systemPrompt);
-      if (!promptSuccess) {
-        res.status(500).json({ error: 'Failed to update system prompt' });
-        return;
-      }
+      console.log('Roles updated successfully');
     }
 
     // Update the in-memory cache

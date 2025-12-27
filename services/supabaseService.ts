@@ -94,30 +94,41 @@ export const updateConfig = async (key: string, value: any): Promise<boolean> =>
   }
 
   try {
-    // Check if the config key exists
+    console.log(`updateConfig called for key: '${key}', value length: ${typeof value === 'string' ? value.length : 'N/A'}`);
+
+    // Check if config key exists
     const checkResult = await pgClient.query(
       'SELECT key FROM system_configs WHERE key = $1',
       [key]
     );
 
+    console.log(`Config '${key}' exists: ${checkResult.rows.length > 0}`);
+
     let result;
     if (checkResult.rows.length > 0) {
       // Update existing record
+      console.log(`Updating existing config '${key}'...`);
       result = await pgClient.query(
         'UPDATE system_configs SET value = $1, updated_at = $2 WHERE key = $3',
         [value, new Date().toISOString(), key]
       );
+      console.log(`Update result for '${key}':`, result);
     } else {
       // Insert new record
+      console.log(`Inserting new config '${key}'...`);
       result = await pgClient.query(
         'INSERT INTO system_configs (key, value, updated_at) VALUES ($1, $2, $3)',
         [key, value, new Date().toISOString()]
       );
+      console.log(`Insert result for '${key}':`, result);
     }
 
+    console.log(`Successfully updated config '${key}'`);
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Error updating config for key '${key}':`, error);
+    console.error('Error message:', error?.message);
+    console.error('Error code:', error?.code);
     return false;
   }
 };
