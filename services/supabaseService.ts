@@ -222,7 +222,7 @@ export const updateModels = async (models: AiModel[]): Promise<{ success: boolea
       }
 
       // Validate provider
-      const validProviders = ['gemini', 'openai', 'openrouter', 'huggingface'];
+      const validProviders = ['gemini', 'openrouter', 'huggingface'];
       if (!validProviders.includes(model.provider.toLowerCase())) {
         throw new Error(`Invalid provider: ${model.provider}`);
       }
@@ -234,10 +234,6 @@ export const updateModels = async (models: AiModel[]): Promise<{ success: boolea
         case 'gemini':
           apiKey = process.env.GEMINI_API_KEY || '';
           if (!apiKey) console.warn(`Warning: GEMINI_API_KEY not set for ${model.name}`);
-          break;
-        case 'openai':
-          apiKey = process.env.OPENAI_API_KEY || '';
-          if (!apiKey) console.warn(`Warning: OPENAI_API_KEY not set for ${model.name}`);
           break;
         case 'openrouter':
           apiKey = process.env.OPENROUTER_API_KEY || '';
@@ -478,20 +474,12 @@ export const initializeAiModels = async (): Promise<void> => {
         is_active: true
       },
       {
-        id: 'openai-1',
-        provider: 'openai',
-        name: 'OpenAI',
-        model_string: 'gpt-4o',
-        api_key: process.env.OPENAI_API_KEY || '',
-        is_active: false
-      },
-      {
-        id: 'openrouter-1',
-        provider: 'openrouter',
-        name: 'OpenRouter',
-        model_string: 'xiaomi/mimo-v2-flash:free',
-        api_key: process.env.OPENROUTER_API_KEY || '',
-        is_active: false
+        id: 'hf-embed-1',
+        provider: 'huggingface',
+        name: 'Qwen3 Embedding',
+        model_string: 'Qwen/Qwen3-Embedding-0.6B',
+        api_key: process.env.HUGGINGFACE_API_KEY || '',
+        is_active: true
       },
       {
         id: 'hf-1',
@@ -550,7 +538,7 @@ export const initializeAiRoleAssignments = async (): Promise<void> => {
       { role_key: 'chatbotText', model_id: 'gemini-1' },
       { role_key: 'chatbotVision', model_id: 'gemini-1' },
       { role_key: 'chatbotAudio', model_id: 'gemini-1' },
-      { role_key: 'rag', model_id: 'openai-1' },
+      { role_key: 'rag', model_id: 'hf-embed-1' },
       { role_key: 'analysis', model_id: 'gemini-1' },
       { role_key: 'sentiment', model_id: 'hf-1' }
     ];

@@ -176,7 +176,7 @@ app.get('/api/roles', async (req, res) => {
       chatbotText: roles.chatbotText || 'gemini-1',
       chatbotVision: roles.chatbotVision || 'gemini-1',
       chatbotAudio: roles.chatbotAudio || 'gemini-1',
-      rag: roles.rag || 'openai-1',
+      rag: roles.rag || 'hf-embed-1',
       analysis: roles.analysis || 'gemini-1',
       sentiment: roles.sentiment || 'hf-1',
       systemPrompt: systemPrompt || 'Bạn là Trợ lý ảo Hỗ trợ Thủ tục Hành chính công. Nhiệm vụ của bạn là hướng dẫn công dân chuẩn bị hồ sơ, giải đáp thắc mắc về quy trình, lệ phí và thời gian giải quyết một cách chính xác, lịch sự và căn cứ theo văn bản pháp luật hiện hành. Tuyệt đối không tư vấn các nội dung trái pháp luật.'

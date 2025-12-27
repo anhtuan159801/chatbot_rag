@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 import apiProxy from './services/apiProxy.js'; // Import the API proxy
 
 const __filename = fileURLToPath(import.meta.url);
@@ -167,12 +168,32 @@ app.get('/webhooks/facebook', (req, res) => {
 // Facebook Webhook Message Handler
 app.post('/webhooks/facebook', express.raw({ type: 'application/json' }), async (req, res) => {
   const VERIFY_TOKEN = process.env.FB_VERIFY_TOKEN || 'dvc_verify_token_2024_secure';
+  const APP_SECRET = process.env.FB_APP_SECRET || '';
   const signature = req.get('X-Hub-Signature-256');
 
   console.log('Received webhook request:', {
-    signature,
-    body: req.body?.toString ? req.body.toString() : req.body
+    signature: signature ? signature.substring(0, 30) + '...' : 'none',
+    body: req.body?.toString ? req.body.toString().substring(0, 200) + '...' : req.body
   });
+
+  // Verify webhook signature if APP_SECRET is configured
+  if (APP_SECRET && signature) {
+    const expectedSignature = 'sha256=' + crypto
+      .createHmac('sha256', APP_SECRET)
+      .update(req.body)
+      .digest('hex');
+
+    if (signature !== expectedSignature) {
+      console.error('Webhook signature verification failed');
+      console.error('Expected:', expectedSignature);
+      console.error('Received:', signature);
+      return res.status(403).send('Forbidden: Invalid signature');
+    }
+
+    console.log('Webhook signature verified successfully');
+  } else if (!APP_SECRET) {
+    console.warn('Warning: FB_APP_SECRET not set, skipping signature verification (not recommended for production)');
+  }
 
   // Parse the request body from raw buffer to JSON
   let body;

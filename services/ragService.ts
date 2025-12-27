@@ -12,10 +12,7 @@ interface KnowledgeChunk {
  * Truy xuất knowledge base từ database và trả về các liên quan nhất
  */
 export class RAGService {
-  private openaiApiKey: string;
-
   constructor() {
-    this.openaiApiKey = process.env.OPENAI_API_KEY || '';
   }
 
   /**
@@ -74,46 +71,41 @@ export class RAGService {
   }
 
   /**
-   * Generate embedding using HuggingFace API (default) or OpenAI API
+   * Generate embedding using configured model from database
    */
   private async generateEmbedding(text: string): Promise<number[] | null> {
     try {
-      // Try OpenAI first if API key is available
-      if (this.openaiApiKey) {
-        try {
-          const response = await fetch('https://api.openai.com/v1/embeddings', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${this.openaiApiKey}`
-            },
-            body: JSON.stringify({
-              model: 'text-embedding-3-small',
-              input: text
-            })
-          });
+      const { getAiRoles, getModels } = await import('./supabaseService.js');
+      
+      const roles = await getAiRoles();
+      const ragModelId = roles.rag;
+      const models = await getModels();
+      const embeddingModel = models.find(m => m.id === ragModelId);
 
-          const data = await response.json();
+      let apiKey = '';
+      let apiUrl = '';
+      let embeddingSize = 768;
 
-          if (response.ok && data.data && Array.isArray(data.data)) {
-            console.log('Generated embedding using OpenAI (1536 dimensions)');
-            return data.data[0].embedding;
-          } else {
-            console.warn('OpenAI API error:', data);
-          }
-        } catch (openaiError) {
-          console.warn('OpenAI embedding failed, trying HuggingFace fallback:', openaiError);
-        }
+      if (embeddingModel && embeddingModel.api_key) {
+        apiKey = embeddingModel.api_key;
+      } else {
+        apiKey = process.env.HUGGINGFACE_API_KEY || '';
       }
 
-      // Fallback to HuggingFace
-      const apiKey = process.env.HUGGINGFACE_API_KEY;
       if (!apiKey) {
-        console.warn('No API keys available, returning null embedding');
+        console.warn('No API key available, returning null embedding');
         return null;
       }
 
-      const response = await fetch('https://api-inference.huggingface.co/models/BAAI/bge-small-en-v1.5', {
+      if (embeddingModel && embeddingModel.model_string) {
+        apiUrl = `https://router.huggingface.co/models/${embeddingModel.model_string}`;
+        console.log(`Using embedding model: ${embeddingModel.model_string}`);
+      } else {
+        apiUrl = 'https://router.huggingface.co/models/Qwen/Qwen3-Embedding-0.6B';
+        console.log('Using default embedding model: Qwen/Qwen3-Embedding-0.6B');
+      }
+
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -127,7 +119,7 @@ export class RAGService {
       const data = await response.json();
 
       if (response.ok && Array.isArray(data)) {
-        console.log('Generated embedding using HuggingFace (384 dimensions)');
+        console.log(`Generated embedding using HuggingFace (${data[0].length} dimensions)`);
         return data[0];
       } else {
         console.error('HuggingFace API error:', data);

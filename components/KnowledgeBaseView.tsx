@@ -61,13 +61,13 @@ const KnowledgeBaseView: React.FC = () => {
 
       try {
         const uploadPromises = files.map(async (file: File) => {
-          const type = file.name.toLowerCase().endsWith('.pdf') ? DocumentType.PDF : DocumentType.DOCX;
-          const size = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('name', file.name);
 
           const response = await fetch('/api/knowledge-base/upload', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: file.name, type, size })
+            body: formData
           });
 
           if (!response.ok) {
@@ -92,7 +92,7 @@ const KnowledgeBaseView: React.FC = () => {
     }
   };
 
-  const handleCrawl = (e: React.FormEvent) => {
+  const handleCrawl = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!crawlUrl) return;
 
@@ -106,35 +106,29 @@ const KnowledgeBaseView: React.FC = () => {
     setIsUploading(true);
     showToast(`Bắt đầu thu thập dữ liệu từ: ${crawlUrl}`, 'info');
 
-    const newDoc: KnowledgeDocument = {
-        id: Math.random().toString(36).substr(2, 9),
-        name: crawlUrl,
-        type: DocumentType.WEB_CRAWL,
-        status: IngestionStatus.PENDING,
-        uploadDate: new Date().toISOString(),
-        vectorCount: 0,
-        size: 'Đang thu thập...'
-    };
+    try {
+        const response = await fetch('/api/knowledge-base/crawl', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: crawlUrl })
+        });
 
-    setDocuments(prev => [newDoc, ...prev]);
+        if (!response.ok) {
+            throw new Error('Failed to crawl webpage');
+        }
+
+        const newDoc = await response.json();
+        setDocuments(prev => [newDoc, ...prev]);
+        await fetchDocuments();
+        setIsUploading(false);
+        showToast('Đang thu thập dữ liệu từ trang web...', 'info');
+    } catch (error) {
+        console.error('Crawl error:', error);
+        setIsUploading(false);
+        showToast('Lỗi khi thu thập dữ liệu web', 'error');
+    }
+
     setCrawlUrl('');
-
-    // Simulate Crawl Process
-    setTimeout(() => {
-        setDocuments(prev => prev.map(d => d.id === newDoc.id ? { ...d, status: IngestionStatus.PROCESSING } : d));
-        showToast(`Đang xử lý trang web: ${crawlUrl}`, 'info');
-
-        setTimeout(() => {
-            setDocuments(prev => prev.map(d => d.id === newDoc.id ? {
-                ...d,
-                status: IngestionStatus.COMPLETED,
-                vectorCount: Math.floor(Math.random() * 200) + 20,
-                size: '45 KB'
-            } : d));
-            setIsUploading(false);
-            showToast('Thu thập dữ liệu hoàn tất.', 'success');
-        }, 4000);
-    }, 1500);
   };
 
   const handleDelete = async (id: string, name: string) => {
