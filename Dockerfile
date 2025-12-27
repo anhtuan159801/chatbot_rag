@@ -8,21 +8,18 @@ RUN apk add --no-cache python3 make g++
 # Copy package files
 COPY package*.json ./
 
-# Install all dependencies (both production and development) for building
-RUN npm ci
-
-# Ensure fresh TypeScript build every time
-RUN rm -rf dist-server node_modules/.vite
+# Install all dependencies (both production and development) for building (no cache)
+RUN npm ci --no-cache
 
 # Copy source code
 COPY . .
 
-# Build the frontend first (creates dist folder)
-RUN npm run build
+# Build the frontend first (creates dist folder) (no cache)
+RUN npm run build --no-cache
 
 # Force rebuild server-side TypeScript files (no cache for JS files)
-# Also invalidate npm ci cache
-RUN rm -rf node_modules/.vite dist-server && npm ci && npx tsc --project tsconfig.server.json
+# Also invalidate npm ci cache (no cache)
+RUN rm -rf node_modules/.vite dist-server && npm ci --no-cache && npx tsc --project tsconfig.server.json --no-cache
 
 # Create production environment file if not exists
 RUN if [ ! -f .env ]; then touch .env; fi
