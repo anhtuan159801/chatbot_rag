@@ -98,11 +98,11 @@ export class RAGService {
       }
 
       if (embeddingModel && embeddingModel.model_string) {
-        apiUrl = `https://router.huggingface.co/models/${embeddingModel.model_string}`;
+        apiUrl = `https://router.huggingface.co/hf-inference/models/${embeddingModel.model_string}/pipeline/feature-extraction`;
         console.log(`Using embedding model: ${embeddingModel.model_string}`);
       } else {
-        apiUrl = 'https://router.huggingface.co/models/Qwen/Qwen3-Embedding-0.6B';
-        console.log('Using default embedding model: Qwen/Qwen3-Embedding-0.6B');
+        apiUrl = 'https://router.huggingface.co/hf-inference/models/BAAI/bge-small-en-v1.5/pipeline/feature-extraction';
+        console.log('Using default embedding model: BAAI/bge-small-en-v1.5');
       }
 
       const response = await fetch(apiUrl, {

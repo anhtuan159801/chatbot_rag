@@ -480,8 +480,8 @@ export const initializeAiModels = async (): Promise<void> => {
       {
         id: 'hf-embed-1',
         provider: 'huggingface',
-        name: 'Qwen3 Embedding',
-        model_string: 'Qwen/Qwen3-Embedding-0.6B',
+        name: 'BGE Small Embedding',
+        model_string: 'BAAI/bge-small-en-v1.5',
         api_key: process.env.HUGGINGFACE_API_KEY || '',
         is_active: true
       },
