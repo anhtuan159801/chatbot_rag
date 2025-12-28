@@ -374,7 +374,7 @@ async function updateDocumentStatus(documentId: string, status: string, vectorCo
 
   const query = vectorCount !== null
     ? 'UPDATE knowledge_base SET status = $1, vector_count = CAST($2 AS integer) WHERE id = $3'
-    : 'UPDATE knowledge_base SET status = $1 WHERE id = $3';
+    : 'UPDATE knowledge_base SET status = $1 WHERE id = $2';
 
   const params = vectorCount !== null ? [status, vectorCount, documentId] : [status, documentId];
 
@@ -438,9 +438,10 @@ async function generateEmbedding(text: string, embeddingModel?: any): Promise<nu
 
     const data = await response.json();
 
-    if (Array.isArray(data)) {
-      console.log(`[EMBEDDING] ✓ Success - embedding dimension: ${data[0].length}`);
-      return data[0];
+    if (Array.isArray(data) && data.length > 0) {
+      const embedding = Array.isArray(data[0]) ? data[0] : data;
+      console.log(`[EMBEDDING] ✓ Success - embedding dimension: ${embedding.length}`);
+      return embedding.map(v => Number(v));
     } else {
       console.error('[EMBEDDING] ✗ Invalid response format - expected array');
       console.error('[EMBEDDING] ✗ API Response:', data);
