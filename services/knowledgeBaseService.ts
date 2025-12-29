@@ -271,9 +271,19 @@ async function processDocumentAsync(documentId: string, name: string, file: Expr
       }
     }
 
-    // Update status to COMPLETED
-    await updateDocumentStatus(documentId, 'COMPLETED', successCount);
-    console.log(`[PROCESSING] ✓✓✓ Document ${name} processed successfully with ${successCount} chunks ✓✓✓`);
+    // Update status based on success count
+    let finalStatus = 'COMPLETED';
+    if (successCount === 0) {
+      finalStatus = 'FAILED';
+      console.error(`[PROCESSING] ✗✗✗ Document ${name} FAILED - No chunks were stored! ✗✗✗`);
+    } else if (successCount < chunksWithMetadata.length) {
+      finalStatus = 'PARTIAL';
+      console.warn(`[PROCESSING] ⚠ Document ${name} PARTIALLY processed - ${successCount}/${chunksWithMetadata.length} chunks stored`);
+    } else {
+      console.log(`[PROCESSING] ✓✓✓ Document ${name} processed successfully with ${successCount} chunks ✓✓✓`);
+    }
+    
+    await updateDocumentStatus(documentId, finalStatus, successCount);
 
   } catch (error) {
     console.error('[PROCESSING] ✗✗✗ ERROR in processDocumentAsync ✗✗✗');
@@ -355,9 +365,19 @@ async function processWebPageAsync(documentId: string, url: string) {
       }
     }
 
-    // Update status to COMPLETED
-    await updateDocumentStatus(documentId, 'COMPLETED', successCount);
-    console.log(`Webpage ${url} processed successfully with ${successCount} chunks`);
+    // Update status based on success count
+    let finalStatus = 'COMPLETED';
+    if (successCount === 0) {
+      finalStatus = 'FAILED';
+      console.error(`✗✗✗ Webpage ${url} FAILED - No chunks were stored! ✗✗✗`);
+    } else if (successCount < chunksWithMetadata.length) {
+      finalStatus = 'PARTIAL';
+      console.warn(`⚠ Webpage ${url} PARTIALLY processed - ${successCount}/${chunksWithMetadata.length} chunks stored`);
+    } else {
+      console.log(`Webpage ${url} processed successfully with ${successCount} chunks`);
+    }
+    
+    await updateDocumentStatus(documentId, finalStatus, successCount);
 
   } catch (error) {
     console.error('Error in processWebPageAsync:', error);
