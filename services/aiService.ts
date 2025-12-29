@@ -202,17 +202,21 @@ export class AIService {
     }
 
     try {
-      const response = await fetch(`https://router.huggingface.co/models/${model}`, {
+      const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
+          'Authorization': `Bearer ${apiKey}`,
+          'X-Wait-For-Model': 'true'
         },
         body: JSON.stringify({
           inputs: fullPrompt,
           parameters: {
             max_new_tokens: 500,
             temperature: 0.7
+          },
+          options: {
+            use_cache: true
           }
         })
       });
