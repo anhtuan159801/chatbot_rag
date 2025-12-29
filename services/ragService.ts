@@ -1,4 +1,5 @@
 import { Client } from 'pg';
+import { InferenceClient } from '@huggingface/inference';
 import pgClient from '../services/supabaseService.js';
 
 interface KnowledgeChunk {
@@ -76,15 +77,14 @@ export class RAGService {
   private async generateEmbedding(text: string): Promise<number[] | null> {
     try {
       const { getAiRoles, getModels } = await import('./supabaseService.js');
-      
+
       const roles = await getAiRoles();
       const ragModelId = roles.rag;
       const models = await getModels();
       const embeddingModel = models.find(m => m.id === ragModelId);
 
       let apiKey = '';
-      let apiUrl = '';
-      let embeddingSize = 768;
+      let modelName = 'BAAI/bge-small-en-v1.5';
 
       if (embeddingModel && embeddingModel.api_key) {
         apiKey = embeddingModel.api_key;
@@ -98,39 +98,41 @@ export class RAGService {
       }
 
       if (embeddingModel && embeddingModel.model_string) {
-        apiUrl = `https://api-inference.huggingface.co/models/${embeddingModel.model_string}/feature-extraction`;
-        console.log(`Using embedding model: ${embeddingModel.model_string}`);
+        modelName = embeddingModel.model_string;
+        console.log(`Using embedding model: ${modelName}`);
       } else {
-        apiUrl = 'https://api-inference.huggingface.co/models/BAAI/bge-small-en-v1.5/feature-extraction';
         console.log('Using default embedding model: BAAI/bge-small-en-v1.5');
       }
 
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'X-Wait-For-Model': 'true'
-        },
-        body: JSON.stringify({
-          inputs: text,
-          options: {
-            use_cache: true
-          }
-        })
+      const client = new InferenceClient(apiKey);
+      const result = await client.featureExtraction({
+        model: modelName,
+        inputs: text
       });
 
-      const data = await response.json();
+      let embedding: number[] | null = null;
 
-      if (response.ok && Array.isArray(data)) {
-        console.log(`Generated embedding using HuggingFace (${data[0].length} dimensions)`);
-        return data[0];
-      } else {
-        console.error('HuggingFace API error:', response.status, data);
+      if (typeof result === 'number') {
+        embedding = [result];
+        console.log(`Generated embedding using HuggingFace (single value)`);
+      } else if (Array.isArray(result) && result.length > 0) {
+        if (typeof result[0] === 'number') {
+          embedding = result as number[];
+          console.log(`Generated embedding using HuggingFace (${result.length} dimensions)`);
+        } else if (Array.isArray(result[0])) {
+          embedding = result[0] as number[];
+          console.log(`Generated embedding using HuggingFace (${result[0].length} dimensions)`);
+        }
+      }
+
+      if (!embedding) {
+        console.error('Invalid embedding format from HuggingFace API');
         return null;
       }
-    } catch (error) {
-      console.error('Error generating embedding:', error);
+
+      return embedding;
+    } catch (error: any) {
+      console.error('Error generating embedding:', error.message);
       return null;
     }
   }

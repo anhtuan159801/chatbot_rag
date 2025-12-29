@@ -1,5 +1,6 @@
 import express from 'express';
 import multer from 'multer';
+import { InferenceClient } from '@huggingface/inference';
 import pgClient from './supabaseService.js';
 import { getAiRoles, getModels } from './supabaseService.js';
 import { storageService } from './storageService.js';
@@ -410,7 +411,7 @@ async function updateDocumentStatus(documentId: string, status: string, vectorCo
 async function generateEmbedding(text: string, embeddingModel?: any): Promise<number[] | null> {
   try {
     let apiKey = '';
-    let apiUrl = '';
+    let modelName = 'BAAI/bge-small-en-v1.5';
 
     if (embeddingModel && embeddingModel.api_key) {
       apiKey = embeddingModel.api_key;
@@ -424,54 +425,38 @@ async function generateEmbedding(text: string, embeddingModel?: any): Promise<nu
     }
 
     if (embeddingModel && embeddingModel.model_string) {
-      apiUrl = `https://api-inference.huggingface.co/models/${embeddingModel.model_string}/feature-extraction`;
-    } else {
-      apiUrl = 'https://api-inference.huggingface.co/models/BAAI/bge-small-en-v1.5/feature-extraction';
+      modelName = embeddingModel.model_string;
     }
 
-    console.log(`[EMBEDDING] Requesting embedding from: ${apiUrl}`);
+    console.log(`[EMBEDDING] Using model: ${modelName}`);
 
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'X-Wait-For-Model': 'true'
-      },
-      body: JSON.stringify({
-        inputs: text,
-        options: {
-          use_cache: true
-        }
-      })
+    const client = new InferenceClient(apiKey);
+    const result = await client.featureExtraction({
+      model: modelName,
+      inputs: text
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[EMBEDDING] ✗ API Error:', response.status, response.statusText);
-      console.error('[EMBEDDING] ✗ API Response Body:', errorText);
+    let embedding: number[] | null = null;
 
-      if (response.status === 404) {
-        console.error('[EMBEDDING] ✗ CRITICAL: Model not found on HuggingFace!');
-        console.error('[EMBEDDING] ✗ Please check model_string in database or use correct model ID');
+    if (typeof result === 'number') {
+      embedding = [result];
+    } else if (Array.isArray(result) && result.length > 0) {
+      if (typeof result[0] === 'number') {
+        embedding = result as number[];
+      } else if (Array.isArray(result[0])) {
+        embedding = result[0] as number[];
       }
-
-      return null;
     }
 
-    const data = await response.json();
-
-    if (Array.isArray(data) && data.length > 0) {
-      const embedding = Array.isArray(data[0]) ? data[0] : data;
-      console.log(`[EMBEDDING] ✓ Success - embedding dimension: ${embedding.length}`);
-      return embedding.map(v => Number(v));
-    } else {
+    if (!embedding) {
       console.error('[EMBEDDING] ✗ Invalid response format - expected array');
-      console.error('[EMBEDDING] ✗ API Response:', data);
       return null;
     }
-  } catch (error) {
-    console.error('[EMBEDDING] ✗ Exception:', error);
+
+    console.log(`[EMBEDDING] ✓ Success - embedding dimension: ${embedding.length}`);
+    return embedding.map(v => Number(v));
+  } catch (error: any) {
+    console.error('[EMBEDDING] ✗ Exception:', error.message);
     return null;
   }
 }

@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { InferenceClient } from '@huggingface/inference';
 
 export interface ModelConfig {
   id: string;
@@ -202,37 +203,25 @@ export class AIService {
     }
 
     try {
-      const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'X-Wait-For-Model': 'true'
-        },
-        body: JSON.stringify({
-          inputs: fullPrompt,
-          parameters: {
-            max_new_tokens: 500,
-            temperature: 0.7
-          },
-          options: {
-            use_cache: true
-          }
-        })
+      const client = new InferenceClient(apiKey);
+      const result = await client.textGeneration({
+        model: model,
+        inputs: fullPrompt,
+        parameters: {
+          max_new_tokens: 500,
+          temperature: 0.7
+        }
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(`HuggingFace API error: ${JSON.stringify(error)}`);
-      }
-
-      const data = await response.json();
-      
-      // Handle different response formats from HuggingFace
-      if (Array.isArray(data)) {
-        return data[0]?.generated_text || '';
-      } else if (data.generated_text) {
-        return data.generated_text;
+      if (result && typeof result === 'object' && 'generated_text' in result) {
+        const text = (result as any).generated_text;
+        // Remove the input prompt from the response if present
+        if (text.startsWith(fullPrompt)) {
+          return text.substring(fullPrompt.length).trim();
+        }
+        return text;
+      } else if (typeof result === 'string') {
+        return result;
       } else {
         throw new Error('Unexpected response format from HuggingFace API');
       }
