@@ -363,27 +363,39 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
   console.log(`[WEBHOOK] ====================\n`);
 
   try {
+    console.log('[WEBHOOK] Step 1: Getting facebook config...');
     const config = await getConfig('facebook_config');
     const pageAccessToken = config?.accessToken;
 
     if (!pageAccessToken) {
       console.error('[WEBHOOK] ✗ Page access token not available, cannot send response');
-      return;
+      throw new Error('FACEBOOK_ACCESS_TOKEN not found in database');
     }
     console.log('[WEBHOOK] ✓ Page access token found');
 
     let response_text = `Cảm ơn bạn đã gửi tin nhắn: "${message_text}". Đây là phản hồi từ hệ thống chatbot.`;
 
+    console.log('[WEBHOOK] Step 2: Loading services...');
+
     try {
       const { AIService } = await import('./services/aiService.js');
-      const { ragService } = await import('./services/ragService.js');
-      const { convertMarkdownToText, truncateForFacebook } = await import('./services/textFormatter.js');
-      const { getModels, getAiRoles } = await import('./services/supabaseService.js');
+      console.log('[WEBHOOK] ✓ AIService loaded');
 
+      const { ragService } = await import('./services/ragService.js');
+      console.log('[WEBHOOK] ✓ RAG service loaded');
+
+      const { convertMarkdownToText, truncateForFacebook } = await import('./services/textFormatter.js');
+      console.log('[WEBHOOK] ✓ Text formatter loaded');
+
+      const { getModels, getAiRoles } = await import('./services/supabaseService.js');
+      console.log('[WEBHOOK] ✓ Supabase service loaded');
+
+      console.log('[WEBHOOK] Step 3: Getting system prompt...');
       const systemPrompt = await getConfig('system_prompt') || 'Bạn là trợ lý ảo hữu ích.';
       console.log('[WEBHOOK] ✓ System prompt loaded');
 
       // Get configured models for chatbot and RAG roles
+      console.log('[WEBHOOK] Step 4: Getting AI models and roles...');
       const roles = await getAiRoles();
       console.log('[WEBHOOK] ✓ AI roles loaded:', JSON.stringify(roles));
 
@@ -401,7 +413,7 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
         console.log('[WEBHOOK] ✓ Using chatbot model:', chatbotModel.name, `(${chatbotModel.provider}/${chatbotModel.model_string})`);
 
         // RAG: Search knowledge base for relevant chunks
-        console.log('[WEBHOOK] 🔍 Searching knowledge base...');
+        console.log('[WEBHOOK] Step 5: 🔍 Searching knowledge base...');
         const relevantChunks = await ragService.searchKnowledge(message_text, 3);
         let ragContext = '';
 
@@ -419,7 +431,7 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
           prompt = `${systemPrompt}\n\nCâu hỏi: ${message_text}\n\nHãy trả lời bằng tiếng Việt, ngắn gọn, dễ hiểu và không sử dụng markdown.`;
         }
 
-        console.log('[WEBHOOK] 🤖 Generating AI response...');
+        console.log('[WEBHOOK] Step 6: 🤖 Generating AI response...');
         const response = await AIService.generateText({
           provider: chatbotModel.provider,
           model: chatbotModel.model_string,
@@ -447,12 +459,13 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
       console.error('[WEBHOOK] ✗ AI generation failed, using fallback response:', aiError);
     }
 
-    console.log('[WEBHOOK] 📤 Sending message to Facebook...');
+    console.log('[WEBHOOK] Step 7: 📤 Sending message to Facebook...');
     const { sendFbMessage } = await import('./services/facebookService.js');
     await sendFbMessage(sender_psid, response_text, pageAccessToken);
     console.log('[WEBHOOK] ✓ Message sent successfully\n');
-  } catch (error) {
+  } catch (error: any) {
     console.error('[WEBHOOK] ✗ Error processing message or sending response:', error);
+    console.error('[WEBHOOK] ✗ Error stack:', error?.stack);
   }
 }
 
