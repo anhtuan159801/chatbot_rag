@@ -357,14 +357,20 @@ app.post('/webhooks/facebook', express.raw({ type: 'application/json' }), async 
 });
 
 async function processMessageAsync(sender_psid: string, message_text: string) {
+  console.log(`\n[WEBHOOK] ====================`);
+  console.log(`[WEBHOOK] Processing message from: ${sender_psid}`);
+  console.log(`[WEBHOOK] Message: ${message_text}`);
+  console.log(`[WEBHOOK] ====================\n`);
+
   try {
     const config = await getConfig('facebook_config');
     const pageAccessToken = config?.accessToken;
 
     if (!pageAccessToken) {
-      console.error('Page access token not available, cannot send response');
+      console.error('[WEBHOOK] ✗ Page access token not available, cannot send response');
       return;
     }
+    console.log('[WEBHOOK] ✓ Page access token found');
 
     let response_text = `Cảm ơn bạn đã gửi tin nhắn: "${message_text}". Đây là phản hồi từ hệ thống chatbot.`;
 
@@ -373,27 +379,37 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
       const { ragService } = await import('./services/ragService.js');
       const { convertMarkdownToText, truncateForFacebook } = await import('./services/textFormatter.js');
       const { getModels, getAiRoles } = await import('./services/supabaseService.js');
-      
+
       const systemPrompt = await getConfig('system_prompt') || 'Bạn là trợ lý ảo hữu ích.';
-      
+      console.log('[WEBHOOK] ✓ System prompt loaded');
+
       // Get configured models for chatbot and RAG roles
       const roles = await getAiRoles();
+      console.log('[WEBHOOK] ✓ AI roles loaded:', JSON.stringify(roles));
+
       const models = await getModels();
+      console.log('[WEBHOOK] ✓ AI models loaded:', models.length, 'models');
+
       const chatbotModelId = roles.chatbotText;
       const chatbotModel = models.find(m => m.id === chatbotModelId);
 
-      if (!chatbotModel || !chatbotModel.is_active) {
-        console.warn('No active chatbot model configured, using fallback response');
+      if (!chatbotModel) {
+        console.error('[WEBHOOK] ✗ Chatbot model not found for ID:', chatbotModelId);
+      } else if (!chatbotModel.is_active) {
+        console.warn('[WEBHOOK] ⚠ Chatbot model is not active:', chatbotModel.name);
       } else {
+        console.log('[WEBHOOK] ✓ Using chatbot model:', chatbotModel.name, `(${chatbotModel.provider}/${chatbotModel.model_string})`);
+
         // RAG: Search knowledge base for relevant chunks
+        console.log('[WEBHOOK] 🔍 Searching knowledge base...');
         const relevantChunks = await ragService.searchKnowledge(message_text, 3);
         let ragContext = '';
-        
+
         if (relevantChunks.length > 0) {
           ragContext = ragService.formatContext(relevantChunks);
-          console.log(`Found ${relevantChunks.length} relevant knowledge chunks`);
+          console.log(`[WEBHOOK] ✓ Found ${relevantChunks.length} relevant knowledge chunks`);
         } else {
-          console.log('No relevant knowledge chunks found, using general response');
+          console.log('[WEBHOOK] ⚠ No relevant knowledge chunks found, using general response');
         }
 
         let prompt = '';
@@ -403,8 +419,7 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
           prompt = `${systemPrompt}\n\nCâu hỏi: ${message_text}\n\nHãy trả lời bằng tiếng Việt, ngắn gọn, dễ hiểu và không sử dụng markdown.`;
         }
 
-        console.log(`Using chatbot model: ${chatbotModel.name} (${chatbotModel.model_string})`);
-        
+        console.log('[WEBHOOK] 🤖 Generating AI response...');
         const response = await AIService.generateText({
           provider: chatbotModel.provider,
           model: chatbotModel.model_string,
@@ -413,21 +428,31 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
           systemPrompt: systemPrompt
         });
 
+        console.log('[WEBHOOK] AI Response type:', typeof response);
+        console.log('[WEBHOOK] AI Response length:', response?.length || 0);
+        console.log('[WEBHOOK] AI Response preview:', response?.substring(0, 100) || 'EMPTY');
+
         if (response && response.trim()) {
           // Convert markdown to plain text for Facebook
           response_text = convertMarkdownToText(response);
+          console.log('[WEBHOOK] ✓ Response converted to plain text');
           // Truncate if too long
           response_text = truncateForFacebook(response_text);
+          console.log('[WEBHOOK] ✓ Response truncated for Facebook');
+        } else {
+          console.error('[WEBHOOK] ✗ AI response is empty or null, using fallback');
         }
       }
     } catch (aiError) {
-      console.error('AI generation failed, using fallback response:', aiError);
+      console.error('[WEBHOOK] ✗ AI generation failed, using fallback response:', aiError);
     }
 
+    console.log('[WEBHOOK] 📤 Sending message to Facebook...');
     const { sendFbMessage } = await import('./services/facebookService.js');
     await sendFbMessage(sender_psid, response_text, pageAccessToken);
+    console.log('[WEBHOOK] ✓ Message sent successfully\n');
   } catch (error) {
-    console.error('Error processing message or sending response:', error);
+    console.error('[WEBHOOK] ✗ Error processing message or sending response:', error);
   }
 }
 
@@ -443,6 +468,30 @@ app.get('/health', (req, res) => {
 // Ping endpoint for external keep-alive services
 app.get('/ping', (req, res) => {
   res.status(200).send('pong');
+});
+
+// Test endpoint for webhook debugging
+app.post('/api/test-webhook', async (req, res) => {
+  try {
+    const { message } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    console.log('[TEST WEBHOOK] Simulating webhook with message:', message);
+
+    // Simulate sender PSID (use test ID)
+    const testSenderId = 'test_user_123';
+
+    // Call processMessageAsync with test data
+    await processMessageAsync(testSenderId, message);
+
+    res.json({ success: true, message: 'Webhook simulation triggered' });
+  } catch (error: any) {
+    console.error('[TEST WEBHOOK] Error:', error);
+    res.status(500).json({ error: error.message || 'Webhook simulation failed' });
+  }
 });
 
 // Serve static files from the 'dist' directory
