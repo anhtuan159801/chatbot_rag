@@ -424,10 +424,9 @@ async function generateEmbedding(text: string, embeddingModel?: any): Promise<nu
     }
 
     if (embeddingModel && embeddingModel.model_string) {
-      apiUrl = `https://router.huggingface.co/hf-inference/models/${embeddingModel.model_string}/pipeline/feature-extraction`;
+      apiUrl = `https://api-inference.huggingface.co/models/${embeddingModel.model_string}/feature-extraction`;
     } else {
-      // Use a working default model
-      apiUrl = 'https://router.huggingface.co/hf-inference/models/BAAI/bge-small-en-v1.5/pipeline/feature-extraction';
+      apiUrl = 'https://api-inference.huggingface.co/models/BAAI/bge-small-en-v1.5/feature-extraction';
     }
 
     console.log(`[EMBEDDING] Requesting embedding from: ${apiUrl}`);
@@ -436,10 +435,14 @@ async function generateEmbedding(text: string, embeddingModel?: any): Promise<nu
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': `Bearer ${apiKey}`,
+        'X-Wait-For-Model': 'true'
       },
       body: JSON.stringify({
-        inputs: text
+        inputs: text,
+        options: {
+          use_cache: true
+        }
       })
     });
 

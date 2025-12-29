@@ -98,10 +98,10 @@ export class RAGService {
       }
 
       if (embeddingModel && embeddingModel.model_string) {
-        apiUrl = `https://router.huggingface.co/hf-inference/models/${embeddingModel.model_string}/pipeline/feature-extraction`;
+        apiUrl = `https://api-inference.huggingface.co/models/${embeddingModel.model_string}/feature-extraction`;
         console.log(`Using embedding model: ${embeddingModel.model_string}`);
       } else {
-        apiUrl = 'https://router.huggingface.co/hf-inference/models/BAAI/bge-small-en-v1.5/pipeline/feature-extraction';
+        apiUrl = 'https://api-inference.huggingface.co/models/BAAI/bge-small-en-v1.5/feature-extraction';
         console.log('Using default embedding model: BAAI/bge-small-en-v1.5');
       }
 
@@ -109,10 +109,14 @@ export class RAGService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
+          'Authorization': `Bearer ${apiKey}`,
+          'X-Wait-For-Model': 'true'
         },
         body: JSON.stringify({
-          inputs: text
+          inputs: text,
+          options: {
+            use_cache: true
+          }
         })
       });
 
@@ -122,7 +126,7 @@ export class RAGService {
         console.log(`Generated embedding using HuggingFace (${data[0].length} dimensions)`);
         return data[0];
       } else {
-        console.error('HuggingFace API error:', data);
+        console.error('HuggingFace API error:', response.status, data);
         return null;
       }
     } catch (error) {
