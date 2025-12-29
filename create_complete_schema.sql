@@ -222,18 +222,18 @@ ON CONFLICT (key) DO NOTHING;
 -- Verify all tables were created
 DO $$
 DECLARE
-    table_name TEXT;
+    tbl_name TEXT;
 BEGIN
     RAISE NOTICE '=== Database Schema Verification ===';
     
-    FOR table_name IN 
+    FOR tbl_name IN 
         SELECT table_name 
         FROM information_schema.tables 
         WHERE table_schema = 'public' 
         AND table_name IN ('system_configs', 'ai_models', 'knowledge_base', 'knowledge_chunks', 'ai_role_assignments')
         ORDER BY table_name
     LOOP
-        RAISE NOTICE '✓ Table created: %', table_name;
+        RAISE NOTICE '✓ Table created: %', tbl_name;
     END LOOP;
     
     RAISE NOTICE '=== All tables created successfully ===';
@@ -242,17 +242,17 @@ END $$;
 -- Verify extensions
 DO $$
 DECLARE
-    ext_name TEXT;
+    ext_var TEXT;
 BEGIN
     RAISE NOTICE '=== Extensions Verification ===';
     
-    FOR ext_name IN 
+    FOR ext_var IN 
         SELECT extname 
         FROM pg_extension 
         WHERE extname IN ('vector', 'uuid-ossp')
         ORDER BY extname
     LOOP
-        RAISE NOTICE '✓ Extension enabled: %', ext_name;
+        RAISE NOTICE '✓ Extension enabled: %', ext_var;
     END LOOP;
     
     RAISE NOTICE '=== All extensions enabled ===';
