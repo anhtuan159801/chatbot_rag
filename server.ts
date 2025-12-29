@@ -364,12 +364,20 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
 
   try {
     console.log('[WEBHOOK] Step 1: Getting facebook config...');
-    const config = await getConfig('facebook_config');
-    const pageAccessToken = config?.accessToken;
+    
+    // Check environment variables first (Koyeb deployment)
+    let pageAccessToken = process.env.FACEBOOK_ACCESS_TOKEN;
+    
+    if (!pageAccessToken) {
+      console.log('[WEBHOOK] Environment variable not set, checking database...');
+      const config = await getConfig('facebook_config');
+      pageAccessToken = config?.accessToken;
+    }
 
     if (!pageAccessToken) {
       console.error('[WEBHOOK] ✗ Page access token not available, cannot send response');
-      throw new Error('FACEBOOK_ACCESS_TOKEN not found in database');
+      console.error('[WEBHOOK] ✗ Check FACEBOOK_ACCESS_TOKEN environment variable');
+      throw new Error('FACEBOOK_ACCESS_TOKEN not found (env or database)');
     }
     console.log('[WEBHOOK] ✓ Page access token found');
 
@@ -523,8 +531,25 @@ const initializeSystem = async () => {
   try {
     await initializeSystemData();
 
-    // Load initial configurations into memory
-    fbConfig = await getConfig('facebook_config');
+    // Load Facebook config from environment variables first, then database
+    fbConfig = {
+      pageId: process.env.FACEBOOK_PAGE_ID || '',
+      accessToken: process.env.FACEBOOK_ACCESS_TOKEN || '',
+      pageName: process.env.FACEBOOK_PAGE_NAME || ''
+    };
+    
+    // If env vars not set, load from database
+    if (!fbConfig.accessToken || !fbConfig.pageId) {
+      const dbConfig = await getConfig('facebook_config');
+      if (dbConfig) {
+        fbConfig = {
+          pageId: dbConfig.pageId || fbConfig.pageId,
+          accessToken: dbConfig.accessToken || fbConfig.accessToken,
+          pageName: dbConfig.pageName || fbConfig.pageName
+        };
+      }
+    }
+
     modelConfigs = await getModels();
     aiRoles = await getAiRoles();
 
@@ -534,7 +559,8 @@ const initializeSystem = async () => {
       aiRoles.systemPrompt = systemPrompt;
     }
 
-    console.log('System configurations loaded from Supabase');
+    console.log('System configurations loaded (env vars + Supabase)');
+    console.log(`Facebook config: pageId=${fbConfig.pageId}, pageName=${fbConfig.pageName}`);
   } catch (error) {
     console.error('Error initializing system data:', error);
   }
