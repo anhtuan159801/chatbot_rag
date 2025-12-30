@@ -1,5 +1,4 @@
-import { Client } from 'pg';
-import 'dotenv/config';
+import dotenv/config';
 
 const connectionString = process.env.SUPABASE_URL;
 
@@ -31,7 +30,7 @@ async function updateQwen3Model() {
       WHERE id IN (
         SELECT model_id FROM ai_role_assignments WHERE role_key = 'rag'
       )
-    `,
+      `,
       [newModelString, newProvider]
     );
 
@@ -48,7 +47,7 @@ async function updateQwen3Model() {
     `);
 
     console.log('📋 Current RAG model configuration:');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━');
     for (const model of verifyResult.rows) {
       console.log(`   ID: ${model.id}`);
       console.log(`   Name: ${model.name}`);
@@ -60,8 +59,8 @@ async function updateQwen3Model() {
     await client.end();
     console.log('\n✓ Model update complete!\n');
   } catch (error) {
-    await client.query('ROLLBACK');
     console.error('❌ Update error:', error);
+    await client.query('ROLLBACK');
     await client.end();
     process.exit(1);
   }

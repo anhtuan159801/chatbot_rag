@@ -1,5 +1,5 @@
 import { Client } from 'pg';
-import 'dotenv/config';
+import dotenv/config';
 
 const connectionString = process.env.SUPABASE_URL;
 
@@ -15,30 +15,30 @@ async function validateVectorConsistency() {
     await client.connect();
     console.log('=== VECTOR CONSISTENCY VALIDATION ===\n');
 
-    const chunksResult = await client.query(`
+    const result = await client.query(`
       SELECT id, knowledge_base_id, array_length(embedding, 1) as dimensions
       FROM knowledge_chunks
       WHERE embedding IS NOT NULL
       ORDER BY knowledge_base_id, chunk_index
     `);
 
-    console.log(`📊 Total chunks with embeddings: ${chunksResult.rows.length}\n`);
+    console.log(`📊 Total chunks with embeddings: ${result.rows.length}\n`);
 
     const dimensionStats = new Map<number, number>();
     const docs = new Set<string>();
 
-    for (const chunk of chunksResult.rows) {
-      const dims = chunk.dimensions;
+    for (const row of result.rows) {
+      const dims = row.dimensions;
       dimensionStats.set(dims, (dimensionStats.get(dims) || 0) + 1);
-      docs.add(chunk.knowledge_base_id);
+      docs.add(row.knowledge_base_id);
 
       if (!dims || dims === 0) {
-        console.log(`⚠️  Chunk ${chunk.id} has 0 dimensions`);
+        console.log(`⚠️  Chunk ${row.id} has 0 dimensions`);
       }
     }
 
     console.log('📏 Dimension Distribution:');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     for (const [dims, count] of Array.from(dimensionStats.entries()).sort((a, b) => a[0] - b[0])) {
       console.log(`   ${dims} dimensions: ${count} chunks`);
     }
