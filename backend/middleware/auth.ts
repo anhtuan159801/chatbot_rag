@@ -8,19 +8,18 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
-export const JWT_SECRET =
-  process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
-export const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+export const JWT_SECRET: string = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
+export const JWT_EXPIRES_IN: string = process.env.JWT_EXPIRES_IN || '7d';
 
 export const generateToken = (userId: string, role: string = 'user'): string => {
-  return jwt.sign({ id: userId, role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  return jwt.sign({ id: userId, role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN } as jwt.SignOptions);
 };
 
 export const verifyToken = (token: string): { id: string; role: string } | null => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as { id: string; role: string };
     return decoded;
-  } catch (error) {
+  } catch {
     return null;
   }
 };
@@ -33,7 +32,7 @@ export const authenticate = (
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Unauthorized: No token provided' });
+    res.status(401).json({ error: 'Unauthorized', message: 'No token provided' });
     return;
   }
 
@@ -41,7 +40,7 @@ export const authenticate = (
   const decoded = verifyToken(token);
 
   if (!decoded) {
-    res.status(401).json({ error: 'Unauthorized: Invalid token' });
+    res.status(401).json({ error: 'Unauthorized', message: 'Invalid token' });
     return;
   }
 
@@ -52,12 +51,12 @@ export const authenticate = (
 export const requireRole = (...allowedRoles: string[]) => {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     if (!req.user) {
-      res.status(401).json({ error: 'Unauthorized: No user found' });
+      res.status(401).json({ error: 'Unauthorized', message: 'No user found' });
       return;
     }
 
     if (!allowedRoles.includes(req.user.role)) {
-      res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
+      res.status(403).json({ error: 'Forbidden', message: 'Insufficient permissions' });
       return;
     }
 
