@@ -1,5 +1,5 @@
 import { Client } from 'pg';
-import dotenv/config';
+import dotenv/config;
 
 const connectionString = process.env.SUPABASE_URL;
 
@@ -16,7 +16,7 @@ async function checkSupabaseHealth() {
     console.log('=== SUPABASE HEALTH CHECK ===\n');
 
     console.log('1. Connection Status: ✓ SUCCESS\n');
-    
+
     const tables = await client.query(`
       SELECT table_name
       FROM information_schema.tables
@@ -26,7 +26,7 @@ async function checkSupabaseHealth() {
     console.log('2. Tables:');
     tables.rows.forEach(row => console.log(`   ✓ ${row.table_name}`));
     console.log(`   Total: ${tables.rows.length} tables\n`);
-    
+
     console.log('3. Extensions:');
     const extensions = await client.query(`
       SELECT extname
