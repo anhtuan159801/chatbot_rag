@@ -8,11 +8,14 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
-export const JWT_SECRET: string = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
+export const JWT_SECRET: string =
+  process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
 export const JWT_EXPIRES_IN: string = process.env.JWT_EXPIRES_IN || '7d';
 
 export const generateToken = (userId: string, role: string = 'user'): string => {
-  return jwt.sign({ id: userId, role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN } as jwt.SignOptions);
+  return jwt.sign({ id: userId, role }, JWT_SECRET, {
+    expiresIn: JWT_EXPIRES_IN,
+  } as jwt.SignOptions);
 };
 
 export const verifyToken = (token: string): { id: string; role: string } | null => {

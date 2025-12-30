@@ -19,17 +19,17 @@ router.post('/ask', async (req, res) => {
 
     const startTime = Date.now();
 
-    // Import RAG service dynamically to avoid circular dependencies
-    const { ragService } = await import('../../services/ragService.js');
-    const { aiService } = await import('../../services/aiService.js');
+    const ragServiceModule = await import('../../services/ragService.js');
+    const { ragService } = ragServiceModule;
+    
+    const aiServiceModule = await import('../../services/aiService.js');
+    const { aiService } = aiServiceModule;
 
-    // Retrieve relevant knowledge chunks
     const chunks = await ragService.searchKnowledge(question, topK);
 
     if (chunks.length === 0) {
       res.json({
-        answer:
-          'Xin lỗi, tôi không tìm thấy thông tin liên quan trong cơ sở dữ liệu. Vui lòng đặt câu hỏi khác hoặc liên hệ quản trị viên.',
+        answer: 'Xin lỗi, tôi không tìm thấy thông tin liên quan trong cơ sở dữ liệu. Vui lòng đặt câu hỏi khác hoặc liên hệ quản trị viên.',
         sources: [],
         metadata: {
           model: config.ai.gemini.model,
@@ -40,10 +40,8 @@ router.post('/ask', async (req, res) => {
       return;
     }
 
-    // Format context for AI
     const context = ragService.formatContext(chunks);
 
-    // Generate response using AI
     const prompt = `${context}\n\nDựa trên các thông tin trên, hãy trả lời câu hỏi: ${question}\n\nTrả lời bằng tiếng Việt, ngắn gọn và dễ hiểu.`;
 
     const answer = await aiService.generateText({
@@ -68,6 +66,7 @@ router.post('/ask', async (req, res) => {
         chunksRetrieved: chunks.length,
       },
     } as ChatResponse);
+
   } catch (error: any) {
     console.error('Error in /api/rag/ask:', error);
     res.status(500).json({
@@ -80,10 +79,11 @@ router.post('/ask', async (req, res) => {
 
 router.get('/health', async (req, res) => {
   try {
-    const { pgClient } = await import('../../services/supabaseService.js');
-
+    const supabaseServiceModule = await import('../../services/supabaseService.js');
+    const pgClient = supabaseServiceModule.default || supabaseServiceModule.pgClient;
+    
     const databaseOk = pgClient !== null;
-    const vectorOk = true; // Will check vector extension
+    const vectorOk = true;
     const aiOk = !!config.ai.huggingface.apiKey || !!config.ai.gemini.apiKey;
 
     const health: HealthResponse = {
