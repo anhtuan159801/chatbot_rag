@@ -2,7 +2,7 @@
 # Dockerfile - Fixed Multi-Stage Build
 # ============================================================================
 # Author: System
-# Description: Production-ready Docker image with proper path structure
+# Description: Production-ready Docker image with proper path handling
 # ============================================================================
 
 FROM node:20-alpine AS base
@@ -16,7 +16,7 @@ FROM base AS deps
 
 RUN apk add --no-cache python3 make g++ libc6-compat
 
-# Copy root package files (for workspaces)
+# Copy root package.json (for workspaces)
 COPY package*.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund
 
@@ -25,18 +25,15 @@ RUN npm ci --ignore-scripts --no-audit --no-fund
 # ============================================================================
 FROM base AS build-backend
 
-# Copy node_modules from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-
 # Copy backend package files
 COPY backend/package*.json ./backend/
-COPY backend/tsconfig*.json ./backend/
 
-# Copy backend source code
+# Copy backend source
 COPY backend/src ./backend/src/
 COPY backend/services ./backend/services/
 COPY backend/middleware ./backend/middleware/
 COPY backend/migrations ./backend/migrations/
+COPY backend/tsconfig*.json ./backend/
 
 # Install backend dependencies and build
 RUN cd backend && npm ci --ignore-scripts --no-audit --no-fund
@@ -47,16 +44,13 @@ RUN cd backend && npx tsc --project tsconfig.server.json
 # ============================================================================
 FROM base AS build-frontend
 
-# Copy node_modules from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-
 # Copy frontend package files
 COPY frontend/package*.json ./frontend/
+
+# Copy frontend source
 COPY frontend/vite.config.ts ./frontend/
 COPY frontend/tsconfig*.json ./frontend/
 COPY frontend/index.html ./frontend/
-
-# Copy frontend source code
 COPY frontend/src ./frontend/src/
 
 # Install frontend dependencies and build
