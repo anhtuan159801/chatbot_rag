@@ -1,13 +1,22 @@
 import express from 'express';
 import { config } from '../config/index.js';
-import { ErrorResponse } from '../models/api.js';
+import { ErrorResponse, HealthResponse } from '../models/api.js';
 
 const router = express.Router();
 
 router.get('/health', (req, res) => {
-  const validation = config;
+  const validation = validateConfig();
+  if (!validation.valid) {
+    const errorResponse: ErrorResponse = {
+      error: 'Bad Request',
+      message: 'Configuration errors: ' + validation.errors.join(', '),
+      timestamp: new Date().toISOString(),
+    };
+    res.status(400).json(errorResponse);
+    return;
+  }
 
-  res.json({
+  const health: HealthResponse = {
     status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
@@ -26,11 +35,26 @@ router.get('/health', (req, res) => {
         hasHuggingFace: !!config.ai.huggingface.apiKey,
       },
     },
-  });
+  };
+
+  res.json(health);
+});
+
+router.post('/validate', (req, res) => {
+  const validation = validateConfig();
+  if (validation.valid) {
+    res.json({ valid: true });
+  } else {
+    const errorResponse: ErrorResponse = {
+      error: 'Bad Request',
+      message: 'Configuration errors: ' + validation.errors.join(', '),
+      timestamp: new Date().toISOString(),
+    };
+    res.status(400).json(errorResponse);
+  }
 });
 
 router.get('/config', (req, res) => {
-  // Return non-sensitive configuration
   res.json({
     server: config.server,
     rag: config.rag,
@@ -39,19 +63,6 @@ router.get('/config', (req, res) => {
       max: config.rateLimit.max,
     },
   });
-});
-
-router.post('/validate', (req, res) => {
-  const validation = await import('../config/index.js').then(m => m.validateConfig());
-
-  if (validation.valid) {
-    res.json({ valid: true });
-  } else {
-    res.status(400).json({
-      valid: false,
-      errors: validation.errors,
-    } as ErrorResponse);
-  }
 });
 
 export const healthRouter = router;

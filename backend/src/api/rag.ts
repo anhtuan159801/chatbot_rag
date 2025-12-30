@@ -21,7 +21,7 @@ router.post('/ask', async (req, res) => {
 
     const ragServiceModule = await import('../../services/ragService.js');
     const { ragService } = ragServiceModule;
-    
+
     const aiServiceModule = await import('../../services/aiService.js');
     const { aiService } = aiServiceModule;
 
@@ -29,7 +29,8 @@ router.post('/ask', async (req, res) => {
 
     if (chunks.length === 0) {
       res.json({
-        answer: 'Xin lỗi, tôi không tìm thấy thông tin liên quan trong cơ sở dữ liệu. Vui lòng đặt câu hỏi khác hoặc liên hệ quản trị viên.',
+        answer:
+          'Xin lỗi, tôi không tìm thấy thông tin liên quan trong cơ sở dữ liệu. Vui lòng đặt câu hỏi khác hoặc liên hệ quản trị viên.',
         sources: [],
         metadata: {
           model: config.ai.gemini.model,
@@ -66,7 +67,6 @@ router.post('/ask', async (req, res) => {
         chunksRetrieved: chunks.length,
       },
     } as ChatResponse);
-
   } catch (error: any) {
     console.error('Error in /api/rag/ask:', error);
     res.status(500).json({
@@ -81,7 +81,7 @@ router.get('/health', async (req, res) => {
   try {
     const supabaseServiceModule = await import('../../services/supabaseService.js');
     const pgClient = supabaseServiceModule.default || supabaseServiceModule.pgClient;
-    
+
     const databaseOk = pgClient !== null;
     const vectorOk = true;
     const aiOk = !!config.ai.huggingface.apiKey || !!config.ai.gemini.apiKey;
