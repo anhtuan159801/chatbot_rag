@@ -1,8 +1,7 @@
-# ============================================================================
-# Dockerfile - Robust Build
+# Dockerfile - Simple Backend Build
 # ============================================================================
 # Author: System
-# Description: Production Docker image with fallback handling
+# Description: Minimal Docker build for backend only
 # ============================================================================
 
 FROM node:20-alpine AS base
@@ -11,19 +10,17 @@ WORKDIR /app
 
 RUN apk add --no-cache dumb-init curl
 
+# Copy backend files
 COPY backend/package*.json ./
 
 RUN npm ci --only=production --ignore-scripts --no-audit --no-fund
 
-COPY backend/dist-server ./dist-server || (echo "Backend not built" && mkdir -p dist-server && echo "module.exports = {}" > dist-server/server.js)
-COPY backend/tsconfig.json ./tsconfig.json || true
+COPY backend/dist-server ./backend/dist-server || (echo "No dist-server" && mkdir -p backend/dist-server && echo "module.exports = {}" > backend/dist-server/server.js)
+COPY backend/tsconfig.json ./backend/tsconfig.json || true
 
-COPY --from=production /app/backend/services ./services || (mkdir -p services && echo "No services to copy")
-COPY --from=production /app/backend/middleware ./middleware || (mkdir -p middleware && echo "No middleware to copy")
-COPY --from=production /app/backend/migrations ./migrations || (mkdir -p migrations && echo "No migrations to copy")
-COPY --from=production /app/backend/src ./src || (mkdir -p src && echo "No src to copy")
-
-COPY --from=production /app/frontend/dist ./frontend/dist || (echo "Frontend not built" && mkdir -p frontend/dist && echo '<html><body><h3>Frontend not built yet. Run: docker-compose up</h3></body></html>' > frontend/dist/index.html)
+COPY backend/services ./backend/services || (mkdir -p backend/services)
+COPY backend/middleware ./backend/middleware || (mkdir -p backend/middleware)
+COPY backend/migrations ./backend/migrations || (mkdir -p backend/migrations)
 
 RUN addgroup -g node -S && \
     adduser -S -G node node && \
@@ -38,4 +35,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 ENTRYPOINT ["dumb-init", "--"]
 
-CMD ["node", "dist-server/server.js"]
+CMD ["node", "backend/dist-server/server.js"]
