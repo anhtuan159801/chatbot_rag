@@ -5,17 +5,6 @@ import { ErrorResponse, HealthResponse } from '../models/api.js';
 const router = express.Router();
 
 router.get('/health', (req, res) => {
-  const validation = validateConfig();
-  if (!validation.valid) {
-    const errorResponse: ErrorResponse = {
-      error: 'Bad Request',
-      message: 'Configuration errors: ' + validation.errors.join(', '),
-      timestamp: new Date().toISOString(),
-    };
-    res.status(400).json(errorResponse);
-    return;
-  }
-
   const health: HealthResponse = {
     status: 'ok',
     timestamp: new Date().toISOString(),
