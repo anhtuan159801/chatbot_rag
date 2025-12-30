@@ -1,8 +1,8 @@
 # ============================================================================
-# Dockerfile - Correct Build Process
+# Dockerfile - Simple Backend Build
 # ============================================================================
 # Author: System
-# Description: Production Docker build without path duplication
+# Description: Build backend only, copy pre-built frontend
 # ============================================================================
 
 FROM node:20-alpine AS base
@@ -10,24 +10,9 @@ FROM node:20-alpine AS base
 WORKDIR /app
 
 # ============================================================================
-# Stage 1: Install Dependencies
-# ============================================================================
-FROM base AS deps
-
-RUN apk add --no-cache python3 make g++ libc6-compat
-
-COPY package*.json ./
-COPY backend/package*.json ./backend/
-COPY frontend/package*.json ./frontend/
-
-RUN npm ci --ignore-scripts --no-audit --no-fund
-
-# ============================================================================
-# Stage 2: Build Backend
+# Stage 1: Build Backend
 # ============================================================================
 FROM base AS build-backend
-
-COPY --from=deps /app/node_modules ./node_modules
 
 COPY backend/package*.json ./backend/
 COPY backend/tsconfig*.json ./backend/
@@ -37,30 +22,11 @@ COPY backend/middleware ./backend/middleware/
 COPY backend/migrations ./backend/migrations/
 COPY backend/server.ts ./backend/
 
-RUN cd backend && npm ci --ignore-scripts --no-audit --no-fund
-RUN cd backend && npx tsc --project tsconfig.json
+RUN cd backend && npm ci --ignore-scripts --no-audit
+RUN cd backend && npx tsc
 
 # ============================================================================
-# Stage 3: Build Frontend
-# ============================================================================
-FROM base AS build-frontend
-
-COPY --from=deps /app/node_modules ./node_modules
-
-COPY frontend/package*.json ./frontend/
-COPY frontend/vite.config.ts ./frontend/
-COPY frontend/tsconfig*.json ./frontend/
-COPY frontend/index.html ./frontend/
-COPY frontend/src ./frontend/src/
-COPY frontend/components ./frontend/components/
-COPY frontend/services ./frontend/services/
-COPY frontend/App.tsx ./frontend/
-
-RUN cd frontend && npm ci --ignore-scripts --no-audit --no-fund
-RUN cd frontend && npm run build
-
-# ============================================================================
-# Stage 4: Production
+# Stage 2: Production Image
 # ============================================================================
 FROM node:20-alpine AS production
 
@@ -69,16 +35,14 @@ WORKDIR /app
 RUN apk add --no-cache dumb-init curl
 
 COPY backend/package*.json ./
-RUN npm ci --only=production --ignore-scripts --no-audit --no-fund
+RUN npm ci --only=production --ignore-scripts --no-audit
 
-COPY --from=build-backend /app/backend/dist-server ./dist-server
-COPY --from=build-backend /app/backend/tsconfig.json ./tsconfig.json
+COPY --from=build-backend /app/backend/dist-server ./backend/dist-server
+COPY --from=build-backend /app/backend/services ./services
+COPY --from=build-backend /app/backend/middleware ./middleware
 
-COPY --from=build-frontend /app/frontend/dist ./dist
-
-RUN addgroup -g node -S && \
-    adduser -S -G node node && \
-    chown -R node:node /app
+RUN addgroup -g node -S && adduser -S -G node node
+RUN chown -R node:node /app
 
 USER node
 
