@@ -1,4 +1,4 @@
-import pg from 'pg';
+import { Client } from 'pg';
 import 'dotenv/config';
 
 const connectionString = process.env.SUPABASE_URL;
@@ -8,7 +8,7 @@ if (!connectionString) {
   process.exit(1);
 }
 
-const client = new pg({ connectionString });
+const client = new Client({ connectionString });
 
 async function validateVectorConsistency() {
   try {
