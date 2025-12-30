@@ -1,43 +1,84 @@
-FROM node:20-alpine
+# ============================================================================
+# Dockerfile - Optimized Multi-Stage Build
+# ============================================================================
+# Author: System
+# Description: Production-ready Docker image with caching and security
+# ============================================================================
+
+FROM node:20-alpine AS base
 
 WORKDIR /app
 
-# Install build dependencies for alpine
-RUN apk add --no-cache python3 make g++
+# ============================================================================
+# Stage 1: Dependencies
+# ============================================================================
+FROM base AS deps
 
-# Install all dependencies (both production and development) for building (no cache)
-# This also invalidates npm package cache
-RUN apk add --no-cache npm
+RUN apk add --no-cache python3 make g++ libc6-compat
 
-# Copy package files
-COPY package*.json ./
+COPY backend/package*.json backend/tsconfig*.json ./
+RUN npm ci --ignore-scripts --no-audit --no-fund
 
-# Install all dependencies (both production and development) for building (no cache)
-RUN npm ci --no-cache
+# ============================================================================
+# Stage 2: Build Backend
+# ============================================================================
+FROM base AS build-backend
 
-# Copy source code
-COPY . .
+COPY --from=deps /app/node_modules ./node_modules
+COPY backend/package*.json backend/tsconfig*.json ./
+COPY backend/tsconfig*.json ./
+COPY backend/src ./src
+COPY backend/services ./services
+COPY backend/middleware ./middleware
 
-# Build the frontend first (creates dist folder) (no cache)
-RUN npm run build --no-cache
+RUN npx tsc --project tsconfig.server.json
 
-# Force rebuild server-side TypeScript files (no cache for JS files)
-# Also invalidate npm ci cache (no cache)
-RUN rm -rf node_modules/.vite dist-server && npm ci --no-cache && npx tsc --project tsconfig.server.json
+# ============================================================================
+# Stage 3: Build Frontend
+# ============================================================================
+FROM base AS build-frontend
 
-# Create production environment file if not exists
-RUN if [ ! -f .env ]; then touch .env; fi
+COPY --from=deps /app/node_modules ./node_modules
+COPY frontend/package*.json frontend/vite.config.ts frontend/tsconfig*.json ./
+COPY frontend/src ./src
+COPY frontend/index.html ./
 
-# Set default port
-ENV PORT=8000
+RUN npm run build
 
-# Expose the port
-EXPOSE 8000
+# ============================================================================
+# Stage 4: Production Image
+# ============================================================================
+FROM node:20-alpine AS production
+
+WORKDIR /app
+
+RUN apk add --no-cache dumb-init curl
+
+COPY backend/package*.json ./
+
+# Install only production dependencies
+RUN npm ci --only=production --ignore-scripts --no-audit --no-fund
+
+COPY --from=build-backend /app/dist-server ./dist-server
+COPY --from=build-backend /app/services ./services
+COPY --from=build-backend /app/middleware ./middleware
+COPY --from=build-frontend /app/dist ./frontend/dist
+
+# Create non-root user for security
+RUN addgroup -g node -S && \
+    adduser -S -G node node && \
+    chown -R node:node /app
+
+USER node
+
+# Expose port
+EXPOSE 8080
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:' + process.env.PORT + '/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:8080/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Start the server
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
 CMD ["node", "dist-server/server.js"]
-

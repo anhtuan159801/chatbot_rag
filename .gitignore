@@ -1,11 +1,16 @@
+# ============================================================================
+# .gitignore - Updated for organized project structure
+# ============================================================================
+
 # Dependencies
 node_modules/
 
 # Production builds
 dist/
 build/
-.next/
-.nuxt/
+.frontend/
+dist-server/
+out/
 
 # Environment variables
 .env
@@ -32,6 +37,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+*.log.*
 
 # Runtime data
 pids
@@ -39,13 +45,14 @@ pids
 *.seed
 *.pid.lock
 
-# Coverage directory used by tools like istanbul
+# Coverage directory
 coverage/
 *.lcov
 
 # Temporary folders
 tmp/
 temp/
+uploads/
 
 # Platform files
 .DS_Store
@@ -57,6 +64,7 @@ Thumbs.db
 *.swp
 *.swo
 *~
+.history/
 
 # Sensitive files
 secrets/
@@ -67,6 +75,8 @@ config/secrets.yml
 *.pfx
 *.pkcs12
 *.jks
+credentials.json
+*-credentials.json
 
 # Browser extensions
 *.crx
@@ -77,15 +87,30 @@ config/secrets.yml
 
 # TypeScript
 *.tsbuildinfo
-dist/
-dist-server/
-out/
 
 # Vite
-!.vite/
+.vite/
 vite.config.ts.timestamp-*.mjs
 
-# NPM
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Test files (keep but ignore temp)
+.jest/
+coverage/
+
+# Migration backups
+*_backup.sql
+*_rollback.sql
+
+# Temporary migration files
+*_temp.sql
+*_test.sql
+
+# Database dumps
+*.dump
+*.sqlc
+
+# Script output files
+output/
+results/
+*.output
+
+opencode.md
