@@ -8,11 +8,19 @@
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_KEY!;
-const dbUrl = process.env.SUPABASE_DB_URL!;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+const dbUrl = process.env.SUPABASE_DB_URL;
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Initialize Supabase client only if env vars are valid
+let supabase: ReturnType<typeof createClient> | null = null;
+if (supabaseUrl && supabaseKey && supabaseUrl.startsWith("http")) {
+  supabase = createClient(supabaseUrl, supabaseKey);
+} else {
+  console.warn(
+    "[Supabase] ⚠️ SUPABASE_URL or SUPABASE_KEY not set. Keyword search will be disabled.",
+  );
+}
 
 let pgClient: Client | null = null;
 
@@ -100,14 +108,35 @@ export const updateModels = async (
 ): Promise<{ success: boolean; error?: string }> => {
   if (!pgClient)
     return { success: false, error: "PostgreSQL client not initialized" };
-  // Implementation omitted for brevity as it's preserved from existing code
-  // ... (Please ensure this function is fully implemented if needed)
+  const client = pgClient;
   try {
-    await pgClient.query("BEGIN");
-    // Basic upsert logic would go here
-    await pgClient.query("COMMIT");
+    await client.query("BEGIN");
+    for (const model of models) {
+      const apiKey =
+        process.env[`${model.provider.toUpperCase()}_API_KEY`] || "";
+      await client.query(
+        `INSERT INTO ai_models (id, provider, name, model_string, api_key, is_active)
+                 VALUES ($1, $2, $3, $4, $5, $6)
+                 ON CONFLICT (id) DO UPDATE SET
+                    provider = EXCLUDED.provider,
+                    name = EXCLUDED.name,
+                    model_string = EXCLUDED.model_string,
+                    api_key = EXCLUDED.api_key,
+                    is_active = EXCLUDED.is_active`,
+        [
+          model.id,
+          model.provider,
+          model.name,
+          model.model_string,
+          apiKey,
+          model.is_active,
+        ],
+      );
+    }
+    await client.query("COMMIT");
     return { success: true };
   } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
     return { success: false, error: String(e) };
   }
 };
@@ -149,7 +178,37 @@ export const updateAiRoles = async (
 };
 
 export const initializeSystemData = async (): Promise<void> => {
-  // Placeholder or implementation from existing code
+  // Implementation preserved from original code
+  if (!pgClient) return;
+  try {
+    const configCount = await pgClient.query(
+      "SELECT COUNT(*) FROM system_configs",
+    );
+    if (parseInt(configCount.rows[0].count) > 0) return;
+
+    const defaults = [
+      {
+        key: "facebook_config",
+        value: {
+          pageId: process.env.FACEBOOK_PAGE_ID || "",
+          accessToken: process.env.FACEBOOK_ACCESS_TOKEN || "",
+          pageName: process.env.FACEBOOK_PAGE_NAME || "",
+        },
+      },
+      {
+        key: "system_prompt",
+        value: "Bạn là Trợ lý ảo Hỗ trợ Thủ tục Hành chính công...",
+      },
+    ];
+    for (const c of defaults) {
+      await pgClient.query(
+        "INSERT INTO system_configs (key, value, updated_at) VALUES ($1, $2::jsonb, $3)",
+        [c.key, JSON.stringify(c.value), new Date().toISOString()],
+      );
+    }
+  } catch (e) {
+    console.error("Error initializing system data:", e);
+  }
 };
 
 // --- NEW: Vector & Keyword Search Functions ---
@@ -199,6 +258,7 @@ export async function searchByKeywords(
   query: string,
   topK: number = 5,
 ): Promise<KnowledgeChunkResult[]> {
+  if (!supabase) return [];
   try {
     const { data, error } = await supabase
       .from("knowledge_chunks")
@@ -208,9 +268,11 @@ export async function searchByKeywords(
 
     if (error) throw error;
     return (
-      data?.map((row) => ({
-        ...row,
-        similarity: 0.6, // Base similarity for keyword matches
+      data?.map((row: any) => ({
+        id: row.id,
+        content: row.content,
+        metadata: row.metadata,
+        similarity: 0.6,
       })) ?? []
     );
   } catch (err) {
