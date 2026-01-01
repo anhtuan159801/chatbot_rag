@@ -172,7 +172,10 @@ export class RAGService {
       const embeddingModel = models.find((m) => m.id === ragModelId);
 
       let modelName = "BAAI/bge-small-en-v1.5";
-      if (embeddingModel?.model_string) {
+      if (
+        embeddingModel?.model_string &&
+        embeddingModel.model_string.includes("bge")
+      ) {
         modelName = embeddingModel.model_string;
       }
 
