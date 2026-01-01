@@ -481,19 +481,30 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
       const models = await getModels();
       console.log("[WEBHOOK] ✓ AI models loaded:", models.length, "models");
 
-      const chatbotModelId = roles.chatbotText;
-      const chatbotModel = models.find((m) => m.id === chatbotModelId);
+      const chatbotModelId = roles.chatbotText || "gemini-1";
+      let chatbotModel = models.find((m) => m.id === chatbotModelId);
+
+      // Fallback to first active model if configured model not found
+      if (!chatbotModel) {
+        console.warn(
+          `[WEBHOOK] ⚠ Chatbot model '${chatbotModelId}' not found, searching for fallback...`,
+        );
+        chatbotModel = models.find(
+          (m) => m.is_active && m.provider === "gemini",
+        );
+      }
 
       if (!chatbotModel) {
         console.error(
-          "[WEBHOOK] ✗ Chatbot model not found for ID:",
-          chatbotModelId,
+          "[WEBHOOK] ✗ No active chatbot model found. Using fallback response.",
         );
+        response_text =
+          "Xin lỗi, hệ thống AI đang bảo trì. Vui lòng thử lại sau.";
       } else if (!chatbotModel.is_active) {
         console.warn(
-          "[WEBHOOK] ⚠ Chatbot model is not active:",
-          chatbotModel.name,
+          `[WEBHOOK] ⚠ Chatbot model '${chatbotModel.name}' is not active.`,
         );
+        response_text = "Xin lỗi, mô hình AI hiện tại đang tạm dừng.";
       } else {
         console.log(
           "[WEBHOOK] ✓ Using chatbot model:",
