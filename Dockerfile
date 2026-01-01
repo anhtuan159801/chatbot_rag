@@ -36,7 +36,7 @@ COPY --from=build /app/backend/middleware ./backend/middleware
 COPY --from=build /app/backend/migrations ./backend/migrations
 COPY --from=build /app/frontend/dist ./frontend/dist
 
-RUN addgroup -g node -S && \
+RUN addgroup -S node && \
     adduser -S -G node node && \
     chown -R node:node /app
 
