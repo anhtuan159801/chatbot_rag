@@ -11,12 +11,14 @@
     "forceConsistentCasingInFileNames": true,
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
-    "noEmit": false,
-    "baseUrl": ".",
-    "paths": {
-      "~shared/*": ["../shared/*"]
-    }
+    "noEmit": false
   },
-  "include": ["server.ts", "services/**/*.ts", "../shared/**/*.ts"],
+  "include": [
+    "server.ts",
+    "services/**/*.ts",
+    "middleware/**/*.ts",
+    "src/**/*.ts",
+    "scripts/**/*.ts"
+  ],
   "exclude": ["node_modules", "dist", "dist-server"]
 }

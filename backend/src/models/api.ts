@@ -19,13 +19,15 @@ export interface ChatResponse {
 }
 
 export interface HealthResponse {
-  status: 'healthy' | 'degraded' | 'unhealthy';
+  status: "healthy" | "degraded" | "unhealthy";
   timestamp: string;
   uptime: number;
-  services: {
-    database: boolean;
-    ai: boolean;
-    vector: boolean;
+  memory?: Record<string, any>;
+  config?: Record<string, any>;
+  services?: {
+    database?: boolean;
+    ai?: boolean;
+    vector?: boolean;
   };
 }
 

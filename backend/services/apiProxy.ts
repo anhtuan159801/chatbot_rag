@@ -1,5 +1,5 @@
 import express from "express";
-import { SystemMetrics, KnowledgeDocument } from "~shared/types";
+import { SystemMetrics, KnowledgeDocument } from "../../shared/types";
 import { AIService } from "./aiService.js";
 import { getModels, getAiRoles } from "./supabaseService.js";
 

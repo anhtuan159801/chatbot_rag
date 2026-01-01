@@ -15,7 +15,6 @@ COPY frontend/package*.json ./frontend/
 RUN npm ci --ignore-scripts --no-audit --no-fund
 
 COPY backend ./backend/
-COPY shared ./shared/
 RUN cd backend && npm run build
 
 COPY frontend ./frontend/
@@ -30,11 +29,10 @@ COPY backend/package*.json ./
 COPY package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund
 
-COPY --from=build /app/backend/dist-server ./backend/dist-server
-COPY --from=build /app/shared ./shared
-COPY --from=build /app/backend/services ./backend/services
-COPY --from=build /app/backend/middleware ./backend/middleware
-COPY --from=build /app/backend/migrations ./backend/migrations
+COPY --from=build /app/backend/dist-server/backend ./backend/
+COPY --from=build /app/backend/dist-server/middleware ./backend/middleware
+COPY --from=build /app/backend/dist-server/scripts ./backend/scripts
+COPY --from=build /app/backend/dist-server/src ./backend/src
 COPY --from=build /app/frontend/dist ./frontend/dist
 
 RUN chown -R node:node /app
@@ -45,4 +43,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD curl -f http://localhost:8080/health || exit 1
 
-CMD ["dumb-init", "node", "backend/dist-server/server.js"]
+CMD ["dumb-init", "node", "backend/server.js"]

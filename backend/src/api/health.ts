@@ -1,12 +1,12 @@
-import express from 'express';
-import { config } from '../config/index.js';
-import { ErrorResponse, HealthResponse } from '../models/api.js';
+import express from "express";
+import { config, validateConfig } from "../config/index.js";
+import { ErrorResponse, HealthResponse } from "../models/api.js";
 
 const router = express.Router();
 
-router.get('/health', (req, res) => {
+router.get("/health", (req, res) => {
   const health: HealthResponse = {
-    status: 'ok',
+    status: "healthy",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     memory: process.memoryUsage(),
@@ -29,21 +29,21 @@ router.get('/health', (req, res) => {
   res.json(health);
 });
 
-router.post('/validate', (req, res) => {
+router.post("/validate", (req, res) => {
   const validation = validateConfig();
   if (validation.valid) {
     res.json({ valid: true });
   } else {
     const errorResponse: ErrorResponse = {
-      error: 'Bad Request',
-      message: 'Configuration errors: ' + validation.errors.join(', '),
+      error: "Bad Request",
+      message: "Configuration errors: " + validation.errors.join(", "),
       timestamp: new Date().toISOString(),
     };
     res.status(400).json(errorResponse);
   }
 });
 
-router.get('/config', (req, res) => {
+router.get("/config", (req, res) => {
   res.json({
     server: config.server,
     rag: config.rag,

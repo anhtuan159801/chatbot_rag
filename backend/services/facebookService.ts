@@ -1,4 +1,4 @@
-import { ChatSession, ChatMessage } from "~shared/types";
+import { ChatSession, ChatMessage } from "../../shared/types";
 
 const GRAPH_API_URL = "https://graph.facebook.com/v18.0";
 

@@ -1,4 +1,4 @@
-import { SystemMetrics, KnowledgeDocument } from "~shared/types";
+import { SystemMetrics, KnowledgeDocument } from "../../shared/types";
 
 export const analyzeSystemHealth = async (
   metrics: SystemMetrics,
