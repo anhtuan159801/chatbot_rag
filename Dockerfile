@@ -31,9 +31,6 @@ COPY package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund
 
 COPY --from=build /app/backend/dist-server/backend ./backend/
-COPY --from=build /app/backend/dist-server/middleware ./backend/middleware
-COPY --from=build /app/backend/dist-server/scripts ./backend/scripts
-COPY --from=build /app/backend/dist-server/src ./backend/src
 COPY --from=build /app/frontend/dist ./frontend/dist
 
 RUN chown -R node:node /app
