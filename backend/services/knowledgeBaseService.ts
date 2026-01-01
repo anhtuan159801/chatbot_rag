@@ -181,6 +181,43 @@ router.delete("/knowledge-base/:id", async (req, res) => {
   }
 });
 
+// DELETE /api/knowledge-base/delete-all - Delete all knowledge base data
+router.delete("/knowledge-base/delete-all", async (req, res) => {
+  try {
+    const pg = await getClient();
+    if (!pg) {
+      return res.status(500).json({ error: "Database not connected" });
+    }
+
+    // Get all documents to delete files from storage
+    const docsResult = await pg.query(
+      "SELECT id, content_url FROM knowledge_base",
+    );
+
+    // Delete files from storage
+    for (const row of docsResult.rows) {
+      if (row.content_url) {
+        try {
+          await storageService.deleteFile(row.content_url);
+        } catch (e) {
+          console.warn(`Failed to delete file: ${row.content_url}`);
+        }
+      }
+    }
+
+    // Delete all chunks (cascade) and documents
+    await pg.query("TRUNCATE knowledge_base CASCADE");
+
+    res.json({
+      success: true,
+      message: "All knowledge base data deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting all knowledge base:", error);
+    res.status(500).json({ error: "Failed to delete all knowledge base" });
+  }
+});
+
 // Async function to process uploaded document (extract, chunk, embed, store)
 async function processDocumentAsync(
   documentId: string,

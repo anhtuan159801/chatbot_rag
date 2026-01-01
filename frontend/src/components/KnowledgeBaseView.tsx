@@ -218,6 +218,38 @@ const KnowledgeBaseView: React.FC = () => {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (documents.length === 0) {
+      showToast("Không có văn bản để xóa.", "info");
+      return;
+    }
+
+    if (
+      window.confirm(
+        `CẢNH BÁO: Bạn có chắc chắn muốn XÓA TẤT CẢ ${documents.length} văn bản? Hành động này không thể hoàn tác!`,
+      )
+    ) {
+      if (window.confirm("Nhập 'DELETE ALL' để xác nhận xóa tất cả:")) {
+        try {
+          const response = await fetch("/api/knowledge-base/delete-all", {
+            method: "DELETE",
+          });
+
+          if (response.ok) {
+            setDocuments([]);
+            setSelectedIds(new Set());
+            showToast("Đã xóa tất cả văn bản thành công.", "success");
+          } else {
+            showToast("Lỗi khi xóa tất cả văn bản", "error");
+          }
+        } catch (error) {
+          console.error("Delete all error:", error);
+          showToast("Lỗi khi xóa tất cả văn bản", "error");
+        }
+      }
+    }
+  };
+
   const toggleSelectAll = () => {
     if (selectedIds.size === filteredDocuments.length) {
       setSelectedIds(new Set());
@@ -361,6 +393,15 @@ const KnowledgeBaseView: React.FC = () => {
             >
               <Trash2 size={16} />
               Xóa ({selectedIds.size})
+            </button>
+          )}
+          {documents.length > 0 && (
+            <button
+              onClick={handleDeleteAll}
+              className="px-4 py-2.5 bg-white hover:bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm font-semibold transition-all shadow-sm flex items-center justify-center gap-2"
+            >
+              <Trash2 size={16} />
+              Xóa tất cả ({documents.length})
             </button>
           )}
           <label className="cursor-pointer px-5 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-sm font-semibold transition-all shadow-md shadow-blue-900/10 flex items-center justify-center gap-2 active:scale-95">
