@@ -36,9 +36,7 @@ COPY --from=build /app/backend/middleware ./backend/middleware
 COPY --from=build /app/backend/migrations ./backend/migrations
 COPY --from=build /app/frontend/dist ./frontend/dist
 
-RUN addgroup -S node && \
-    adduser -S -G node node && \
-    chown -R node:node /app
+RUN chown -R node:node /app
 
 USER node
 EXPOSE 8080
