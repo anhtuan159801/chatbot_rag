@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "outDir": "./dist-server",
     "rootDir": "../",
     "strict": true,
@@ -12,10 +12,11 @@
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "noEmit": false,
+    "baseUrl": ".",
     "paths": {
       "~shared/*": ["../shared/*"]
     }
   },
-  "include": ["server.ts", "services/**/*.ts"],
+  "include": ["server.ts", "services/**/*.ts", "../shared/**/*.ts"],
   "exclude": ["node_modules", "dist", "dist-server"]
 }

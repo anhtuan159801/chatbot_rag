@@ -4,7 +4,7 @@
     "module": "ES2020",
     "moduleResolution": "bundler",
     "outDir": "./dist-server",
-    "rootDir": "./",
+    "rootDir": "..",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -13,18 +13,9 @@
     "resolveJsonModule": true,
     "noEmit": false,
     "paths": {
-      "~shared/*": [
-        "../shared/*"
-      ]
+      "~shared/*": ["../shared/*"]
     }
   },
-  "include": [
-    "server.ts",
-    "services/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "dist-server"
-  ]
+  "include": ["server.ts", "services/**/*.ts", "../shared/**/*.ts"],
+  "exclude": ["node_modules", "dist", "dist-server"]
 }
