@@ -32,7 +32,9 @@ let modelConfigs: any[] = [];
 let aiRoles: Record<string, string> = {};
 
 // Initialize HuggingFace Client
-const hfClient = new InferenceClient(process.env.HF_API_KEY || "");
+const hfApiKey =
+  process.env.HF_API_KEY || process.env.HUGGINGFACE_API_KEY || "";
+const hfClient = new InferenceClient(hfApiKey);
 
 // Middleware
 app.use(express.json({ limit: "10mb" }));
