@@ -15,6 +15,7 @@ COPY frontend/package*.json ./frontend/
 RUN npm ci --ignore-scripts --no-audit --no-fund
 
 COPY backend ./backend/
+COPY shared ./shared/
 RUN cd backend && npm run build
 
 COPY frontend ./frontend/
