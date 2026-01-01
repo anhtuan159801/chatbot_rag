@@ -8,16 +8,25 @@
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
-const dbUrl = process.env.SUPABASE_DB_URL;
+// Detect Supabase project URL (should be https://xxx.supabase.co)
+const envSupabaseUrl = process.env.SUPABASE_URL;
+// Detect Supabase anon key
+const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY;
+// Database connection string - prioritize direct DB URL, fallback to Supabase URL if it looks like a DB string
+let dbUrl = process.env.SUPABASE_DB_URL;
+if (!dbUrl && envSupabaseUrl && envSupabaseUrl.startsWith("postgresql://")) {
+  dbUrl = envSupabaseUrl;
+  console.log("[Supabase] Detected database URL from SUPABASE_URL");
+}
 
+// Initialize Supabase client only if we have a valid project URL
 let supabase: ReturnType<typeof createClient> | null = null;
-if (supabaseUrl && supabaseKey && supabaseUrl.startsWith("http")) {
-  supabase = createClient(supabaseUrl, supabaseKey);
-} else {
+if (envSupabaseUrl && envSupabaseUrl.startsWith("http") && supabaseKey) {
+  supabase = createClient(envSupabaseUrl, supabaseKey);
+  console.log("[Supabase] ✅ Supabase client initialized");
+} else if (envSupabaseUrl && !envSupabaseUrl.startsWith("http")) {
   console.warn(
-    "[Supabase] ⚠️ SUPABASE_URL or SUPABASE_KEY not set. Keyword search disabled.",
+    "[Supabase] ⚠️ SUPABASE_URL format invalid. Expected https://xxx.supabase.co",
   );
 }
 
