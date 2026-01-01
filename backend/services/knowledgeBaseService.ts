@@ -304,28 +304,56 @@ async function processDocumentAsync(
 
     // Generate and store embeddings for each chunk
     let successCount = 0;
+    let hasVectorSupport = true;
+
     for (let i = 0; i < chunksWithMetadata.length; i++) {
       try {
         const embedding = await generateEmbedding(
           chunksWithMetadata[i].text,
           embeddingModel,
         );
-        if (embedding && pg) {
+
+        if (embedding && pg && hasVectorSupport) {
+          try {
+            await pg.query(
+              `INSERT INTO knowledge_chunks (knowledge_base_id, content, content_vector, chunk_index, metadata)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [
+                documentId,
+                chunksWithMetadata[i].text,
+                `[${embedding.join(",")}]`,
+                chunksWithMetadata[i].index,
+                JSON.stringify(chunksWithMetadata[i].metadata),
+              ],
+            );
+            successCount++;
+          } catch (vectorError: any) {
+            // Check if error is about missing column
+            if (
+              vectorError.code === "42703" ||
+              vectorError.message?.includes("content_vector")
+            ) {
+              console.warn(
+                "[PROCESSING] ⚠ content_vector column not found, storing text without vector",
+              );
+              hasVectorSupport = false;
+            } else {
+              throw vectorError;
+            }
+          }
+        } else if (!hasVectorSupport && pg) {
+          // Store text without vector
           await pg.query(
-            `INSERT INTO knowledge_chunks (knowledge_base_id, content, embedding, chunk_index, metadata)
-             VALUES ($1, $2, $3, $4, $5)`,
+            `INSERT INTO knowledge_chunks (knowledge_base_id, content, chunk_index, metadata)
+             VALUES ($1, $2, $3, $4)`,
             [
               documentId,
               chunksWithMetadata[i].text,
-              `[${embedding.join(",")}]`,
               chunksWithMetadata[i].index,
               JSON.stringify(chunksWithMetadata[i].metadata),
             ],
           );
           successCount++;
-          console.log(
-            `[PROCESSING] ✓ Stored chunk ${i + 1}/${chunksWithMetadata.length} for: ${name}`,
-          );
         } else {
           console.warn(
             `[PROCESSING] ⚠ Failed to generate embedding for chunk ${i + 1}`,
