@@ -4,7 +4,7 @@ interface CacheEntry<T> {
   ttl: number;
 }
 
-export class CacheService {
+class CacheService {
   private cache: Map<string, CacheEntry<any>>;
   private defaultTTL: number;
   private maxSize: number;
@@ -15,11 +15,17 @@ export class CacheService {
     this.defaultTTL = defaultTTL;
   }
 
+  getCacheKey(prefix: string, params: Record<string, any>): string {
+    const sortedParams = Object.keys(params)
+      .sort()
+      .map((k) => `${k}:${params[k]}`)
+      .join("|");
+    return `${prefix}:${sortedParams}`;
+  }
+
   get<T>(key: string): T | null {
     const entry = this.cache.get(key);
-    if (!entry) {
-      return null;
-    }
+    if (!entry) return null;
 
     const now = Date.now();
     if (now - entry.timestamp > entry.ttl) {
@@ -31,45 +37,25 @@ export class CacheService {
   }
 
   set<T>(key: string, data: T, ttl?: number): void {
+    // Cleanup if cache is full
+    if (this.cache.size >= this.maxSize) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey) this.cache.delete(firstKey);
+    }
+
     const entry: CacheEntry<T> = {
       data,
       timestamp: Date.now(),
       ttl: ttl ?? this.defaultTTL,
     };
 
-    if (this.cache.size >= this.maxSize) {
-      const firstKey = this.cache.keys().next().value;
-      if (firstKey) {
-        this.cache.delete(firstKey);
-      }
-    }
-
     this.cache.set(key, entry);
-  }
-
-  delete(key: string): boolean {
-    return this.cache.delete(key);
   }
 
   clear(): void {
     this.cache.clear();
   }
-
-  size(): number {
-    return this.cache.size;
-  }
-
-  getCacheKey(prefix: string, params: Record<string, any>): string {
-    const sortedParams = Object.keys(params)
-      .sort()
-      .map(k => `${k}:${params[k]}`)
-      .join('|');
-    return `${prefix}:${sortedParams}`;
-  }
 }
 
-export const embeddingCache = new CacheService(500, 3600000);
-export const queryCache = new CacheService(200, 300000);
-export const ragCache = new CacheService(100, 600000);
-
-export default CacheService;
+export const embeddingCache = new CacheService(500, 3600000); // 1 hour
+export const ragCache = new CacheService(200, 300000); // 5 mins

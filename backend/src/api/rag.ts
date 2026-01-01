@@ -1,4 +1,5 @@
 import express from "express";
+import { InferenceClient } from "@huggingface/inference";
 import { config } from "../config/index.js";
 import {
   ChatRequest,
@@ -7,6 +8,7 @@ import {
   HealthResponse,
 } from "../models/api.js";
 import { generateToken } from "../../middleware/auth.js";
+import { RAGService } from "../../services/ragService.js";
 
 const router = express.Router();
 
@@ -29,8 +31,8 @@ router.post("/ask", async (req, res) => {
 
     const startTime = Date.now();
 
-    const ragServiceModule = await import("../../services/ragService.js");
-    const { ragService } = ragServiceModule;
+    const hfClient = new InferenceClient(config.ai.huggingface.apiKey || "");
+    const ragService = new RAGService(hfClient);
 
     const chunks = await ragService.searchKnowledge(question, topK);
 
@@ -109,7 +111,6 @@ router.post("/ask", async (req, res) => {
       }
     } else if (provider === "huggingface") {
       try {
-        const { InferenceClient } = await import("@huggingface/inference");
         const client = new InferenceClient(config.ai.huggingface.apiKey);
 
         const result = await client.textGeneration({
@@ -130,7 +131,7 @@ router.post("/ask", async (req, res) => {
 
     res.json({
       answer: answer || "Không có phản hồi từ AI.",
-      sources: chunks.map((c) => ({
+      sources: chunks.map((c: any) => ({
         id: c.id,
         content: c.content.substring(0, 200) + "...",
         similarity: c.similarity,
