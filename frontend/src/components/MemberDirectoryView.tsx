@@ -1,119 +1,139 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Phone, MessageSquare, Mail, Plus, Edit3, Trash2, X, Save } from 'lucide-react';
-import { Member } from '../types';
-import { useToast } from './Toast';
+import React, { useState, useEffect } from "react";
+import {
+  Search,
+  Phone,
+  MessageSquare,
+  Mail,
+  Plus,
+  Edit3,
+  Trash2,
+  X,
+  Save,
+} from "lucide-react";
+import { Member } from "~shared/types";
+import { useToast } from "./Toast";
 
 const MemberDirectoryView: React.FC = () => {
   const { showToast } = useToast();
   const [members, setMembers] = useState<Member[]>(() => {
     // Try to load from localStorage, fallback to mock data
-    const saved = localStorage.getItem('memberDirectory');
+    const saved = localStorage.getItem("memberDirectory");
     if (saved) {
       try {
         return JSON.parse(saved);
       } catch (e) {
-        console.error('Error loading members from localStorage:', e);
+        console.error("Error loading members from localStorage:", e);
       }
     }
-    
+
     // Default mock data for KP69 community board
     return [
       {
-        id: '1',
-        name: 'Nguyễn Văn A',
-        position: 'Trưởng khu phố',
-        role: 'Quản lý chung',
-        phone: '+84 987 654 321',
-        email: 'truongkupho@example.com',
-        facebookId: 'nguyenvana',
-        department: 'Ban điều hành khu phố',
-        tasks: ['Quản lý an ninh', 'Phối hợp với công an', 'Giải quyết tranh chấp'],
+        id: "1",
+        name: "Nguyễn Văn A",
+        position: "Trưởng khu phố",
+        role: "Quản lý chung",
+        phone: "+84 987 654 321",
+        email: "truongkupho@example.com",
+        facebookId: "nguyenvana",
+        department: "Ban điều hành khu phố",
+        tasks: [
+          "Quản lý an ninh",
+          "Phối hợp với công an",
+          "Giải quyết tranh chấp",
+        ],
       },
       {
-        id: '2',
-        name: 'Trần Thị B',
-        position: 'Phó khu phố',
-        role: 'Tài chính',
-        phone: '+84 976 543 210',
-        email: 'phokuphotaichinh@example.com',
-        facebookId: 'tranthib',
-        department: 'Ban điều hành khu phố',
-        tasks: ['Quản lý tài chính', 'Thu phí dịch vụ', 'Lập báo cáo tài chính'],
+        id: "2",
+        name: "Trần Thị B",
+        position: "Phó khu phố",
+        role: "Tài chính",
+        phone: "+84 976 543 210",
+        email: "phokuphotaichinh@example.com",
+        facebookId: "tranthib",
+        department: "Ban điều hành khu phố",
+        tasks: [
+          "Quản lý tài chính",
+          "Thu phí dịch vụ",
+          "Lập báo cáo tài chính",
+        ],
       },
       {
-        id: '3',
-        name: 'Lê Văn C',
-        position: 'Phó khu phố',
-        role: 'Văn hóa - Xã hội',
-        phone: '+84 965 432 109',
-        email: 'phokuphovxh@example.com',
-        facebookId: 'levanc',
-        department: 'Ban điều hành khu phố',
-        tasks: ['Tuyên truyền', 'Văn hóa văn nghệ', 'Phong trào địa phương'],
+        id: "3",
+        name: "Lê Văn C",
+        position: "Phó khu phố",
+        role: "Văn hóa - Xã hội",
+        phone: "+84 965 432 109",
+        email: "phokuphovxh@example.com",
+        facebookId: "levanc",
+        department: "Ban điều hành khu phố",
+        tasks: ["Tuyên truyền", "Văn hóa văn nghệ", "Phong trào địa phương"],
       },
       {
-        id: '4',
-        name: 'Phạm Thị D',
-        position: 'Thành viên',
-        role: 'Phụ trách Nữ công',
-        phone: '+84 954 321 098',
-        email: 'nucong@example.com',
-        facebookId: 'phamthid',
-        department: 'Ban điều hành khu phố',
-        tasks: ['Phụ nữ - Gia đình', 'Hội phụ nữ', 'Chăm sóc người cao tuổi'],
+        id: "4",
+        name: "Phạm Thị D",
+        position: "Thành viên",
+        role: "Phụ trách Nữ công",
+        phone: "+84 954 321 098",
+        email: "nucong@example.com",
+        facebookId: "phamthid",
+        department: "Ban điều hành khu phố",
+        tasks: ["Phụ nữ - Gia đình", "Hội phụ nữ", "Chăm sóc người cao tuổi"],
       },
       {
-        id: '5',
-        name: 'Hoàng Văn E',
-        position: 'Thành viên',
-        role: 'An ninh trật tự',
-        phone: '+84 943 210 987',
-        email: 'antoan@example.com',
-        facebookId: 'hoangvane',
-        department: 'Ban điều hành khu phố',
-        tasks: ['Giám sát an ninh', 'Phối hợp tuần tra', 'Báo cáo sự việc'],
-      }
+        id: "5",
+        name: "Hoàng Văn E",
+        position: "Thành viên",
+        role: "An ninh trật tự",
+        phone: "+84 943 210 987",
+        email: "antoan@example.com",
+        facebookId: "hoangvane",
+        department: "Ban điều hành khu phố",
+        tasks: ["Giám sát an ninh", "Phối hợp tuần tra", "Báo cáo sự việc"],
+      },
     ];
   });
-  
-  const [searchTerm, setSearchTerm] = useState('');
+
+  const [searchTerm, setSearchTerm] = useState("");
   const [showAddEditModal, setShowAddEditModal] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
-  const [newMember, setNewMember] = useState<Omit<Member, 'id'>>({
-    name: '',
-    position: '',
-    role: '',
-    phone: '',
-    email: '',
-    facebookId: '',
-    department: '',
-    tasks: [''],
+  const [newMember, setNewMember] = useState<Omit<Member, "id">>({
+    name: "",
+    position: "",
+    role: "",
+    phone: "",
+    email: "",
+    facebookId: "",
+    department: "",
+    tasks: [""],
   });
 
   // Save to localStorage whenever members change
   useEffect(() => {
-    localStorage.setItem('memberDirectory', JSON.stringify(members));
+    localStorage.setItem("memberDirectory", JSON.stringify(members));
   }, [members]);
 
   // Filter members based on search term
-  const filteredMembers = members.filter(member => 
-    member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.position.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.phone.includes(searchTerm) ||
-    (member.email && member.email.toLowerCase().includes(searchTerm.toLowerCase()))
+  const filteredMembers = members.filter(
+    (member) =>
+      member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      member.position.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      member.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      member.phone.includes(searchTerm) ||
+      (member.email &&
+        member.email.toLowerCase().includes(searchTerm.toLowerCase())),
   );
 
   const handleAddMember = () => {
     setEditingMember(null);
     setNewMember({
-      name: '',
-      position: '',
-      role: '',
-      phone: '',
-      email: '',
-      department: '',
-      tasks: [''],
+      name: "",
+      position: "",
+      role: "",
+      phone: "",
+      email: "",
+      department: "",
+      tasks: [""],
     });
     setShowAddEditModal(true);
   };
@@ -125,28 +145,30 @@ const MemberDirectoryView: React.FC = () => {
       position: member.position,
       role: member.role,
       phone: member.phone,
-      email: member.email || '',
-      facebookId: member.facebookId || '',
-      department: member.department || '',
+      email: member.email || "",
+      facebookId: member.facebookId || "",
+      department: member.department || "",
       tasks: member.tasks,
     });
     setShowAddEditModal(true);
   };
 
   const handleDeleteMember = (id: string) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa thành viên này?')) {
-      setMembers(members.filter(member => member.id !== id));
-      showToast('Đã xóa thành viên', 'success');
+    if (window.confirm("Bạn có chắc chắn muốn xóa thành viên này?")) {
+      setMembers(members.filter((member) => member.id !== id));
+      showToast("Đã xóa thành viên", "success");
     }
   };
 
   const handleSaveMember = () => {
     if (editingMember) {
       // Update existing member
-      setMembers(members.map(m => 
-        m.id === editingMember.id ? { ...editingMember, ...newMember } : m
-      ));
-      showToast('Cập nhật thành viên thành công', 'success');
+      setMembers(
+        members.map((m) =>
+          m.id === editingMember.id ? { ...editingMember, ...newMember } : m,
+        ),
+      );
+      showToast("Cập nhật thành viên thành công", "success");
     } else {
       // Add new member
       const memberToAdd: Member = {
@@ -154,7 +176,7 @@ const MemberDirectoryView: React.FC = () => {
         id: Date.now().toString(),
       };
       setMembers([...members, memberToAdd]);
-      showToast('Thêm thành viên thành công', 'success');
+      showToast("Thêm thành viên thành công", "success");
     }
     setShowAddEditModal(false);
   };
@@ -168,24 +190,24 @@ const MemberDirectoryView: React.FC = () => {
       // Create Facebook Messenger URL
       const fbLink = `https://www.facebook.com/messages/t/${member.facebookId}`;
       // In a real implementation, we would open the Facebook Messenger app
-      window.open(fbLink, '_blank');
-      showToast(`Đang mở tin nhắn Facebook đến ${member.name}`, 'info');
+      window.open(fbLink, "_blank");
+      showToast(`Đang mở tin nhắn Facebook đến ${member.name}`, "info");
     } else if (member.email) {
       // Fallback to email if no Facebook ID
       const emailLink = `mailto:${member.email}?subject=Liên hệ hỗ trợ khu phố&body=${encodeURIComponent(message)}`;
-      window.open(emailLink, '_blank');
-      showToast(`Đang mở email đến ${member.email}`, 'info');
+      window.open(emailLink, "_blank");
+      showToast(`Đang mở email đến ${member.email}`, "info");
     } else {
       // Copy phone number to clipboard if no other contact method
       navigator.clipboard.writeText(member.phone);
-      showToast(`Đã sao chép số điện thoại: ${member.phone}`, 'info');
+      showToast(`Đã sao chép số điện thoại: ${member.phone}`, "info");
     }
   };
 
   const addTaskField = () => {
     setNewMember({
       ...newMember,
-      tasks: [...newMember.tasks, ''],
+      tasks: [...newMember.tasks, ""],
     });
   };
 
@@ -211,9 +233,12 @@ const MemberDirectoryView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Danh bạ Ban Điều hành Khu phố 69</h2>
+          <h2 className="text-2xl font-bold text-slate-900">
+            Danh bạ Ban Điều hành Khu phố 69
+          </h2>
           <p className="text-slate-500 text-sm mt-1">
-            Liên hệ trực tiếp với các thành viên trong ban điều hành khu phố để được hỗ trợ chính xác nhất
+            Liên hệ trực tiếp với các thành viên trong ban điều hành khu phố để
+            được hỗ trợ chính xác nhất
           </p>
         </div>
         <button
@@ -234,13 +259,15 @@ const MemberDirectoryView: React.FC = () => {
           <div>
             <h3 className="font-semibold text-blue-800 mb-1">Liên hệ hỗ trợ</h3>
             <p className="text-blue-700 text-sm">
-              Nếu bạn là người dân tại khu phố 69, bạn có thể liên hệ đến các đồng chí: 
+              Nếu bạn là người dân tại khu phố 69, bạn có thể liên hệ đến các
+              đồng chí:
               {members.map((member, index) => (
                 <span key={member.id}>
                   {member.name} - {member.position} - {member.phone}
-                  {index < members.length - 1 && ', '}
+                  {index < members.length - 1 && ", "}
                 </span>
-              ))} để được hỗ trợ chính xác nhất về các vấn đề liên quan đến khu phố.
+              ))}{" "}
+              để được hỗ trợ chính xác nhất về các vấn đề liên quan đến khu phố.
             </p>
           </div>
         </div>
@@ -249,7 +276,11 @@ const MemberDirectoryView: React.FC = () => {
       {/* Search Bar */}
       <div className="flex flex-col sm:flex-row gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         <div className="relative flex-1">
-          <Search size={18} className="absolute left-3 top-3 text-slate-400" aria-hidden="true" />
+          <Search
+            size={18}
+            className="absolute left-3 top-3 text-slate-400"
+            aria-hidden="true"
+          />
           <input
             type="text"
             placeholder="Tìm kiếm thành viên theo tên, vị trí, số điện thoại..."
@@ -265,7 +296,9 @@ const MemberDirectoryView: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredMembers.length === 0 ? (
           <div className="col-span-full text-center py-12">
-            <div className="text-slate-400 mb-4">Không tìm thấy thành viên phù hợp</div>
+            <div className="text-slate-400 mb-4">
+              Không tìm thấy thành viên phù hợp
+            </div>
             <button
               onClick={handleAddMember}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -288,8 +321,12 @@ const MemberDirectoryView: React.FC = () => {
                       </span>
                     </div>
                     <div>
-                      <h3 className="font-bold text-lg text-slate-900">{member.name}</h3>
-                      <p className="text-slate-500 text-sm">{member.position}</p>
+                      <h3 className="font-bold text-lg text-slate-900">
+                        {member.name}
+                      </h3>
+                      <p className="text-slate-500 text-sm">
+                        {member.position}
+                      </p>
                       <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">
                         {member.role}
                       </span>
@@ -302,25 +339,34 @@ const MemberDirectoryView: React.FC = () => {
                     <Phone size={16} className="text-slate-400 flex-shrink-0" />
                     <span className="truncate">{member.phone}</span>
                   </div>
-                  
+
                   {member.email && (
                     <div className="flex items-center gap-3 text-slate-600">
-                      <Mail size={16} className="text-slate-400 flex-shrink-0" />
+                      <Mail
+                        size={16}
+                        className="text-slate-400 flex-shrink-0"
+                      />
                       <span className="truncate">{member.email}</span>
                     </div>
                   )}
-                  
+
                   {member.department && (
                     <div className="text-sm text-slate-500">
-                      <span className="font-medium">Ban:</span> {member.department}
+                      <span className="font-medium">Ban:</span>{" "}
+                      {member.department}
                     </div>
                   )}
-                  
+
                   <div className="pt-2">
-                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Nhiệm vụ</div>
+                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                      Nhiệm vụ
+                    </div>
                     <ul className="space-y-1">
                       {member.tasks.map((task, index) => (
-                        <li key={index} className="text-sm text-slate-600 flex items-start gap-1.5">
+                        <li
+                          key={index}
+                          className="text-sm text-slate-600 flex items-start gap-1.5"
+                        >
                           <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-slate-300 flex-shrink-0"></span>
                           <span>{task}</span>
                         </li>
@@ -364,7 +410,7 @@ const MemberDirectoryView: React.FC = () => {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-100 animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
               <h3 className="text-lg font-bold text-slate-900">
-                {editingMember ? 'Chỉnh sửa thành viên' : 'Thêm thành viên mới'}
+                {editingMember ? "Chỉnh sửa thành viên" : "Thêm thành viên mới"}
               </h3>
               <button
                 onClick={() => setShowAddEditModal(false)}
@@ -376,89 +422,119 @@ const MemberDirectoryView: React.FC = () => {
             </div>
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Họ và tên</label>
+                <label className="text-sm font-bold text-slate-700">
+                  Họ và tên
+                </label>
                 <input
                   type="text"
                   value={newMember.name}
-                  onChange={(e) => setNewMember({...newMember, name: e.target.value})}
+                  onChange={(e) =>
+                    setNewMember({ ...newMember, name: e.target.value })
+                  }
                   placeholder="Nhập họ và tên"
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 px-4 text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                 />
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Vị trí</label>
+                  <label className="text-sm font-bold text-slate-700">
+                    Vị trí
+                  </label>
                   <input
                     type="text"
                     value={newMember.position}
-                    onChange={(e) => setNewMember({...newMember, position: e.target.value})}
+                    onChange={(e) =>
+                      setNewMember({ ...newMember, position: e.target.value })
+                    }
                     placeholder="Ví dụ: Trưởng khu phố"
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 px-4 text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
                 </div>
-                
+
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Vai trò</label>
+                  <label className="text-sm font-bold text-slate-700">
+                    Vai trò
+                  </label>
                   <input
                     type="text"
                     value={newMember.role}
-                    onChange={(e) => setNewMember({...newMember, role: e.target.value})}
+                    onChange={(e) =>
+                      setNewMember({ ...newMember, role: e.target.value })
+                    }
                     placeholder="Ví dụ: Quản lý chung"
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 px-4 text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Số điện thoại</label>
+                <label className="text-sm font-bold text-slate-700">
+                  Số điện thoại
+                </label>
                 <input
                   type="tel"
                   value={newMember.phone}
-                  onChange={(e) => setNewMember({...newMember, phone: e.target.value})}
+                  onChange={(e) =>
+                    setNewMember({ ...newMember, phone: e.target.value })
+                  }
                   placeholder="Nhập số điện thoại"
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 px-4 text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                 />
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Email (Tùy chọn)</label>
+                  <label className="text-sm font-bold text-slate-700">
+                    Email (Tùy chọn)
+                  </label>
                   <input
                     type="email"
                     value={newMember.email}
-                    onChange={(e) => setNewMember({...newMember, email: e.target.value})}
+                    onChange={(e) =>
+                      setNewMember({ ...newMember, email: e.target.value })
+                    }
                     placeholder="Nhập địa chỉ email"
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 px-4 text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Facebook ID (Tùy chọn)</label>
+                  <label className="text-sm font-bold text-slate-700">
+                    Facebook ID (Tùy chọn)
+                  </label>
                   <input
                     type="text"
                     value={newMember.facebookId}
-                    onChange={(e) => setNewMember({...newMember, facebookId: e.target.value})}
+                    onChange={(e) =>
+                      setNewMember({ ...newMember, facebookId: e.target.value })
+                    }
                     placeholder="Nhập Facebook ID"
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 px-4 text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Bộ phận/Ban (Tùy chọn)</label>
+                <label className="text-sm font-bold text-slate-700">
+                  Bộ phận/Ban (Tùy chọn)
+                </label>
                 <input
                   type="text"
                   value={newMember.department}
-                  onChange={(e) => setNewMember({...newMember, department: e.target.value})}
+                  onChange={(e) =>
+                    setNewMember({ ...newMember, department: e.target.value })
+                  }
                   placeholder="Nhập tên bộ phận"
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 px-4 text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <label className="text-sm font-bold text-slate-700">Nhiệm vụ</label>
+                  <label className="text-sm font-bold text-slate-700">
+                    Nhiệm vụ
+                  </label>
                   <button
                     type="button"
                     onClick={addTaskField}
@@ -504,7 +580,7 @@ const MemberDirectoryView: React.FC = () => {
                 className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
               >
                 <Save size={16} className="inline mr-1" />
-                {editingMember ? 'Cập nhật' : 'Lưu'}
+                {editingMember ? "Cập nhật" : "Lưu"}
               </button>
             </div>
           </div>
