@@ -242,6 +242,7 @@ async function processDocumentAsync(
       type: "DOCUMENT",
       totalPages: extractedText.metadata.totalPages,
       words: extractedText.metadata.words,
+      content_url: storedFile.url,
     });
 
     console.log(

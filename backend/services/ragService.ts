@@ -203,7 +203,12 @@ export class RAGService {
   formatContext(chunks: KnowledgeChunk[]): string {
     if (chunks.length === 0) return "";
     return chunks
-      .map((chunk, index) => `[Kiến thức ${index + 1}]:\n${chunk.content}\n`)
+      .map((chunk, index) => {
+        const sourceUrl =
+          chunk.metadata?.content_url || chunk.metadata?.source || "";
+        const sourceInfo = sourceUrl ? `\nNguồn: ${sourceUrl}` : "";
+        return `[Kiến thức ${index + 1}]:\n${chunk.content}${sourceInfo}\n`;
+      })
       .join("\n");
   }
 }
