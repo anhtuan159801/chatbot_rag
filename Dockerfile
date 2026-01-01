@@ -26,7 +26,8 @@ WORKDIR /app
 RUN apk add --no-cache dumb-init curl
 
 COPY backend/package*.json ./
-RUN npm ci --only=production --ignore-scripts --no-audit --no-fund
+COPY package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund
 
 COPY --from=build /app/backend/dist-server ./backend/dist-server
 COPY --from=build /app/backend/services ./backend/services
