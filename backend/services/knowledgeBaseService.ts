@@ -2,7 +2,7 @@ import express from "express";
 import multer from "multer";
 import { InferenceClient } from "@huggingface/inference";
 import crypto from "crypto";
-import pgClient from "./supabaseService.js";
+import { getClient } from "./supabaseService.js";
 import { getAiRoles, getModels } from "./supabaseService.js";
 import { storageService } from "./storageService.js";
 import { textExtractorService } from "./textExtractorService.js";
@@ -20,11 +20,12 @@ const upload = multer({
 // GET /api/knowledge-base - Get all knowledge base documents
 router.get("/knowledge-base", async (req, res) => {
   try {
-    if (!pgClient) {
+    const pg = await getClient();
+    if (!pg) {
       return res.status(500).json({ error: "Database not connected" });
     }
 
-    const result = await pgClient.query(
+    const result = await pg.query(
       `SELECT id, name, type, status, upload_date, vector_count, size, content_url
        FROM knowledge_base
        ORDER BY upload_date DESC`,
@@ -62,7 +63,8 @@ router.post(
       const documentType = type || getFileType(req.file.originalname);
       const size = (req.file.size / 1024 / 1024).toFixed(2) + " MB";
 
-      if (!pgClient) {
+      const pg = await getClient();
+      if (!pg) {
         return res.status(500).json({ error: "Database not connected" });
       }
 
@@ -70,7 +72,7 @@ router.post(
       const documentId = crypto.randomUUID();
 
       // Insert document with PENDING status
-      const result = await pgClient.query(
+      const result = await pg.query(
         `INSERT INTO knowledge_base (id, name, type, size, content_url, status)
        VALUES ($1, $2, $3, $4, $5, 'PENDING')
        RETURNING id, name, type, status, upload_date, vector_count, size, content_url`,
@@ -110,7 +112,8 @@ router.post("/knowledge-base/crawl", async (req, res) => {
       return res.status(400).json({ error: "URL is required" });
     }
 
-    if (!pgClient) {
+    const pg = await getClient();
+    if (!pg) {
       return res.status(500).json({ error: "Database not connected" });
     }
 
@@ -118,7 +121,7 @@ router.post("/knowledge-base/crawl", async (req, res) => {
     const documentId = crypto.randomUUID();
 
     // Insert document with PENDING status
-    const result = await pgClient.query(
+    const result = await pg.query(
       `INSERT INTO knowledge_base (id, name, type, size, content_url, status)
        VALUES ($1, $2, $3, $4, $5, 'PENDING')
        RETURNING id, name, type, status, upload_date, vector_count, size, content_url`,
@@ -153,12 +156,13 @@ router.delete("/knowledge-base/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    if (!pgClient) {
+    const pg = await getClient();
+    if (!pg) {
       return res.status(500).json({ error: "Database not connected" });
     }
 
     // Get document info first to delete the file
-    const docResult = await pgClient.query(
+    const docResult = await pg.query(
       "SELECT content_url FROM knowledge_base WHERE id = $1",
       [id],
     );
@@ -168,7 +172,7 @@ router.delete("/knowledge-base/:id", async (req, res) => {
     }
 
     // Delete document (this will cascade delete chunks)
-    await pgClient.query("DELETE FROM knowledge_base WHERE id = $1", [id]);
+    await pg.query("DELETE FROM knowledge_base WHERE id = $1", [id]);
 
     res.json({ success: true, message: "Document deleted successfully" });
   } catch (error) {
@@ -186,10 +190,9 @@ async function processDocumentAsync(
   try {
     console.log(`[PROCESSING] Starting for document: ${name} (${documentId})`);
 
-    if (!pgClient) {
-      console.error(
-        "[PROCESSING] ERROR: pgClient is null, cannot process document",
-      );
+    const pg = await getClient();
+    if (!pg) {
+      console.error("[PROCESSING] ERROR: pg is null, cannot process document");
       throw new Error("Database connection not available");
     }
 
@@ -202,10 +205,10 @@ async function processDocumentAsync(
     console.log(`[PROCESSING] File saved to storage: ${storedFile.url}`);
 
     // Update content_url in database
-    await pgClient.query(
-      "UPDATE knowledge_base SET content_url = $1 WHERE id = $2",
-      [storedFile.url, documentId],
-    );
+    await pg.query("UPDATE knowledge_base SET content_url = $1 WHERE id = $2", [
+      storedFile.url,
+      documentId,
+    ]);
     console.log(`[PROCESSING] Database updated with content_url`);
 
     // Get local file path for extraction
@@ -269,8 +272,8 @@ async function processDocumentAsync(
           chunksWithMetadata[i].text,
           embeddingModel,
         );
-        if (embedding && pgClient) {
-          await pgClient.query(
+        if (embedding && pg) {
+          await pg.query(
             `INSERT INTO knowledge_chunks (knowledge_base_id, content, embedding, chunk_index, metadata)
              VALUES ($1, $2, $3, $4, $5)`,
             [
@@ -333,6 +336,12 @@ async function processWebPageAsync(documentId: string, url: string) {
   try {
     console.log(`Starting processing for webpage: ${url} (${documentId})`);
 
+    const pg = await getClient();
+    if (!pg) {
+      console.error("ERROR: pg is null, cannot process webpage");
+      throw new Error("Database connection not available");
+    }
+
     // Update status to PROCESSING
     await updateDocumentStatus(documentId, "PROCESSING");
     console.log(`Status updated to PROCESSING for: ${url}`);
@@ -385,8 +394,8 @@ async function processWebPageAsync(documentId: string, url: string) {
           chunksWithMetadata[i].text,
           embeddingModel,
         );
-        if (embedding && pgClient) {
-          await pgClient.query(
+        if (embedding && pg) {
+          await pg.query(
             `INSERT INTO knowledge_chunks (knowledge_base_id, content, embedding, chunk_index, metadata)
              VALUES ($1, $2, $3, $4, $5)`,
             [
@@ -436,10 +445,9 @@ async function updateDocumentStatus(
   status: string,
   vectorCount: number | null = null,
 ) {
-  if (!pgClient) {
-    console.error(
-      "[UPDATE STATUS] ERROR: pgClient is null, cannot update status",
-    );
+  const pg = await getClient();
+  if (!pg) {
+    console.error("[UPDATE STATUS] ERROR: pg is null, cannot update status");
     return;
   }
 
@@ -454,7 +462,7 @@ async function updateDocumentStatus(
       : [status, documentId];
 
   try {
-    await pgClient.query(query, params);
+    await pg.query(query, params);
     console.log(
       `[UPDATE STATUS] ${documentId} -> ${status} ${vectorCount !== null ? `(vectors: ${vectorCount})` : ""}`,
     );

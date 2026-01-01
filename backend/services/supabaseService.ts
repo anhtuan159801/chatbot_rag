@@ -22,34 +22,41 @@ if (supabaseUrl && supabaseKey && supabaseUrl.startsWith("http")) {
 }
 
 let pgClient: Client | null = null;
-let connectionReady = false;
+let connectionPromise: Promise<void> | null = null;
 
-async function initDatabase() {
+function initDatabase(): Promise<void> {
+  if (connectionPromise) return connectionPromise;
+
   if (!dbUrl) {
     console.warn(
       "[Supabase] ⚠️ SUPABASE_DB_URL not set. Vector search disabled.",
     );
-    return;
+    connectionPromise = Promise.resolve();
+    return connectionPromise;
   }
 
-  const client = new Client({
-    connectionString: dbUrl,
-    connectionTimeoutMillis: 15000,
-  });
+  connectionPromise = (async () => {
+    try {
+      const client = new Client({
+        connectionString: dbUrl,
+        connectionTimeoutMillis: 30000,
+      });
 
-  try {
-    await client.connect();
-    console.log("[Supabase] ✅ Connected to PostgreSQL database");
-    pgClient = client;
-    connectionReady = true;
-  } catch (err) {
-    console.error("[Supabase] ❌ Failed to connect to PostgreSQL:", err);
-    // Don't throw - allow app to start, but operations will fail gracefully
-  }
+      await client.connect();
+      console.log("[Supabase] ✅ Connected to PostgreSQL database");
+      pgClient = client;
+    } catch (err) {
+      console.error("[Supabase] ❌ Failed to connect to PostgreSQL:", err);
+      pgClient = null;
+      throw err; // Propagate error so caller knows
+    }
+  })();
+
+  return connectionPromise;
 }
 
-// Initialize on module load
-initDatabase();
+// Start initialization immediately
+initDatabase().catch(() => {});
 
 export interface KnowledgeChunkResult {
   id: string;
@@ -58,20 +65,26 @@ export interface KnowledgeChunkResult {
   similarity: number;
 }
 
-// Helper to check connection
-function checkConnection(): boolean {
-  if (!connectionReady || !pgClient) {
-    console.warn("[Supabase] Database not ready yet");
-    return false;
+// Helper to get client, waiting for connection if needed
+async function getDbClient(): Promise<Client | null> {
+  if (!pgClient) {
+    console.log("[Supabase] Waiting for database connection...");
+    try {
+      await initDatabase();
+    } catch (e) {
+      console.error("[Supabase] Failed to connect:", e);
+      return null;
+    }
   }
-  return true;
+  return pgClient;
 }
 
 // --- Existing Config & Model Management Functions ---
 export const getConfig = async (key: string): Promise<any | null> => {
-  if (!checkConnection()) return null;
+  const client = await getClient();
+  if (!client) return null;
   try {
-    const result = await pgClient!.query(
+    const result = await client.query(
       "SELECT value FROM system_configs WHERE key = $1",
       [key],
     );
@@ -86,21 +99,22 @@ export const updateConfig = async (
   key: string,
   value: any,
 ): Promise<boolean> => {
-  if (!checkConnection()) return false;
+  const client = await getClient();
+  if (!client) return false;
   try {
     const jsonValue = JSON.stringify(value);
-    const checkResult = await pgClient!.query(
+    const checkResult = await client.query(
       "SELECT key FROM system_configs WHERE key = $1",
       [key],
     );
 
     if (checkResult.rows.length > 0) {
-      await pgClient!.query(
+      await client.query(
         "UPDATE system_configs SET value = $1::jsonb, updated_at = $2 WHERE key = $3",
         [jsonValue, new Date().toISOString(), key],
       );
     } else {
-      await pgClient!.query(
+      await client.query(
         "INSERT INTO system_configs (key, value, updated_at) VALUES ($1, $2::jsonb, $3)",
         [key, jsonValue, new Date().toISOString()],
       );
@@ -113,9 +127,10 @@ export const updateConfig = async (
 };
 
 export const getModels = async (): Promise<any[]> => {
-  if (!checkConnection()) return [];
+  const client = await getClient();
+  if (!client) return [];
   try {
-    const result = await pgClient!.query(
+    const result = await client.query(
       "SELECT id, provider, name, model_string, api_key, is_active FROM ai_models ORDER BY name ASC",
     );
     return result.rows;
@@ -128,14 +143,18 @@ export const getModels = async (): Promise<any[]> => {
 export const updateModels = async (
   models: any[],
 ): Promise<{ success: boolean; error?: string }> => {
-  if (!checkConnection())
-    return { success: false, error: "Database not connected" };
+  const client = await getClient();
+  if (!client)
+    return {
+      success: false,
+      error: "Database not connected. Please wait a moment and try again.",
+    };
   try {
-    await pgClient!.query("BEGIN");
+    await client.query("BEGIN");
     for (const model of models) {
       const apiKey =
         process.env[`${model.provider.toUpperCase()}_API_KEY`] || "";
-      await pgClient!.query(
+      await client.query(
         `INSERT INTO ai_models (id, provider, name, model_string, api_key, is_active)
          VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (id) DO UPDATE SET
@@ -154,18 +173,21 @@ export const updateModels = async (
         ],
       );
     }
-    await pgClient!.query("COMMIT");
+    await client.query("COMMIT");
     return { success: true };
   } catch (e) {
-    await pgClient!.query("ROLLBACK").catch(() => {});
+    try {
+      await client.query("ROLLBACK");
+    } catch {}
     return { success: false, error: String(e) };
   }
 };
 
 export const getAiRoles = async (): Promise<Record<string, string>> => {
-  if (!checkConnection()) return {};
+  const client = await getClient();
+  if (!client) return {};
   try {
-    const result = await pgClient!.query(
+    const result = await client.query(
       "SELECT role_key, model_id FROM ai_role_assignments",
     );
     const roles: Record<string, string> = {};
@@ -182,11 +204,12 @@ export const getAiRoles = async (): Promise<Record<string, string>> => {
 export const updateAiRoles = async (
   roles: Record<string, string>,
 ): Promise<boolean> => {
-  if (!checkConnection()) return false;
+  const client = await getClient();
+  if (!client) return false;
   try {
-    await pgClient!.query("DELETE FROM ai_role_assignments");
+    await client.query("DELETE FROM ai_role_assignments");
     for (const [key, val] of Object.entries(roles)) {
-      await pgClient!.query(
+      await client.query(
         "INSERT INTO ai_role_assignments (role_key, model_id) VALUES ($1, $2)",
         [key, val],
       );
@@ -199,9 +222,10 @@ export const updateAiRoles = async (
 };
 
 export const initializeSystemData = async (): Promise<void> => {
-  if (!checkConnection()) return;
+  const client = await getClient();
+  if (!client) return;
   try {
-    const configCount = await pgClient!.query(
+    const configCount = await client.query(
       "SELECT COUNT(*) FROM system_configs",
     );
     if (parseInt(configCount.rows[0].count) > 0) return;
@@ -221,7 +245,7 @@ export const initializeSystemData = async (): Promise<void> => {
       },
     ];
     for (const c of defaults) {
-      await pgClient!.query(
+      await client.query(
         "INSERT INTO system_configs (key, value, updated_at) VALUES ($1, $2::jsonb, $3)",
         [c.key, JSON.stringify(c.value), new Date().toISOString()],
       );
@@ -237,9 +261,10 @@ export async function checkVectorDimension(
   table: string,
   column: string,
 ): Promise<number | null> {
-  if (!checkConnection()) return null;
+  const client = await getClient();
+  if (!client) return null;
   try {
-    const res = await pgClient!.query(
+    const res = await client.query(
       `SELECT attndims FROM pg_attribute WHERE attrelid = $1::regclass AND attname = $2;`,
       [table, column],
     );
@@ -254,11 +279,12 @@ export async function searchByVector(
   embedding: number[],
   topK: number = 5,
 ): Promise<KnowledgeChunkResult[]> {
-  if (!checkConnection()) return [];
+  const client = await getClient();
+  if (!client) return [];
   try {
     const embeddingStr = embedding.join(",");
     const query = `SELECT id, content, metadata, 1 - (content_vector <=> cube(array[${embeddingStr}])) AS similarity FROM knowledge_chunks ORDER BY content_vector <=> cube(array[${embeddingStr}]) LIMIT $1;`;
-    const { rows } = await pgClient!.query(query, [topK]);
+    const { rows } = await client.query(query, [topK]);
     return rows || [];
   } catch (err) {
     console.error("[Supabase] ❌ Vector search failed:", err);
@@ -292,4 +318,9 @@ export async function searchByKeywords(
   }
 }
 
-export default pgClient;
+// Export client accessor for other services
+export async function getClient(): Promise<Client | null> {
+  return getDbClient();
+}
+
+export default { initDatabase, getClient };
