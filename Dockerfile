@@ -30,7 +30,8 @@ COPY backend/package*.json ./
 COPY package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund
 
-COPY --from=build /app/dist-server ./backend/dist-server
+COPY --from=build /app/backend/dist-server ./backend/dist-server
+COPY --from=build /app/shared ./shared
 COPY --from=build /app/backend/services ./backend/services
 COPY --from=build /app/backend/middleware ./backend/middleware
 COPY --from=build /app/backend/migrations ./backend/migrations
