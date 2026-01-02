@@ -376,13 +376,14 @@ async function processDocumentAsync(
 
         if (embedding && pg && hasVectorSupport) {
           try {
+            const embeddingArrayLiteral = `{${embedding.join(',')}}`;
             await pg.query(
               `INSERT INTO knowledge_chunks (knowledge_base_id, content, embedding, chunk_index, metadata)
                VALUES ($1, $2, $3, $4, $5)`,
               [
                 documentId,
                 chunksWithMetadata[i].text,
-                embedding,
+                embeddingArrayLiteral,
                 chunksWithMetadata[i].index,
                 JSON.stringify(chunksWithMetadata[i].metadata),
               ],
@@ -540,13 +541,14 @@ async function processWebPageAsync(documentId: string, url: string) {
 
         if (embedding && pg && hasVectorSupport) {
           try {
+            const embeddingArrayLiteral = `{${embedding.join(',')}}`;
             await pg.query(
               `INSERT INTO knowledge_chunks (knowledge_base_id, content, embedding, chunk_index, metadata)
                VALUES ($1, $2, $3, $4, $5)`,
               [
                 documentId,
                 chunksWithMetadata[i].text,
-                embedding,
+                embeddingArrayLiteral,
                 chunksWithMetadata[i].index,
                 JSON.stringify(chunksWithMetadata[i].metadata),
               ],
