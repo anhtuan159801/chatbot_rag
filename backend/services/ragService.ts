@@ -274,8 +274,12 @@ export class RAGService {
     // Extract all unique URLs from the chunks
     const urls = new Set<string>();
     chunks.forEach(chunk => {
-      if (chunk.metadata?.content_url) urls.add(chunk.metadata.content_url);
-      if (chunk.metadata?.source) urls.add(chunk.metadata.source);
+      if (chunk.metadata?.content_url && chunk.metadata.content_url.trim() !== '') {
+        urls.add(chunk.metadata.content_url);
+      }
+      if (chunk.metadata?.source && chunk.metadata.source.trim() !== '') {
+        urls.add(chunk.metadata.source);
+      }
     });
 
     const urlsText = urls.size > 0
