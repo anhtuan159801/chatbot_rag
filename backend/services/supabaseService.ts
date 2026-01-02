@@ -413,12 +413,31 @@ export async function searchByKeywords(
 ): Promise<KnowledgeChunkResult[]> {
   if (!supabase) return [];
   try {
-    const { data, error } = await supabase
+    // First try the standard websearch
+    let { data, error } = await supabase
       .from("knowledge_chunks")
       .select("id, content, metadata")
       .textSearch("content", query, { type: "websearch" })
       .limit(topK);
+
+    // If no results from websearch, try a more flexible search for Vietnamese content
+    if (!error && (!data || data.length === 0)) {
+      // Try a more flexible search that handles Vietnamese text better
+      const { data: fuzzyData, error: fuzzyError } = await supabase
+        .from("knowledge_chunks")
+        .select("id, content, metadata")
+        .ilike("content", `%${query}%`)  // Case-insensitive partial match
+        .limit(topK);
+
+      if (!fuzzyError && fuzzyData && fuzzyData.length > 0) {
+        data = fuzzyData;
+      } else if (fuzzyError) {
+        console.warn("[Supabase] Fallback keyword search error:", fuzzyError.message);
+      }
+    }
+
     if (error) throw error;
+
     return (
       data?.map((row: any) => ({
         id: row.id,

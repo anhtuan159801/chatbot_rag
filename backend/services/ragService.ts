@@ -51,7 +51,7 @@ export class RAGService {
   }
 
   /**
-   * Hybrid Search: semantic + keyword
+   * Enhanced Hybrid Search: semantic + keyword with Vietnamese administrative term handling
    */
   async searchKnowledge(
     query: string,
@@ -85,10 +85,13 @@ export class RAGService {
           `[RAG] ⚠️ Vector dimension mismatch (DB=${dim}, expected=384)`,
         );
 
+      // Enhanced query processing for Vietnamese administrative terms
+      const enhancedQuery = this.enhanceQueryForVietnameseTerms(query);
+
       // Perform hybrid search
       const [vectorResults, keywordResults] = await Promise.allSettled([
-        this.searchByVector(query, topK * 2),
-        this.searchByKeywords(query, topK * 2),
+        this.searchByVector(enhancedQuery, topK * 2),
+        this.searchByKeywords(enhancedQuery, topK * 2),
       ]);
 
       const safeVector =
@@ -99,7 +102,7 @@ export class RAGService {
       const merged = this.mergeAndRank(safeVector, safeKeyword, topK);
 
       // Optional Re-ranking
-      const ranked = await reRankResults(this.hfClient, query, merged);
+      const ranked = await reRankResults(this.hfClient, enhancedQuery, merged);
 
       ragCache.set(cacheKey, ranked, this.CACHE_TTL);
       const ms = Date.now() - start;
@@ -112,6 +115,47 @@ export class RAGService {
       console.error("[RAG] 💥 Error in RAG pipeline:", err);
       return [];
     }
+  }
+
+  /**
+   * Enhance query for better Vietnamese administrative term matching
+   */
+  private enhanceQueryForVietnameseTerms(query: string): string {
+    // Common Vietnamese administrative term mappings
+    const termMappings: { [key: string]: string[] } = {
+      'tạm trú': ['tạm trú', 'đăng ký tạm trú', 'KT3', 'khai báo tạm trú', 'thủ tục tạm trú'],
+      'tạm vắng': ['tạm vắng', 'đăng ký tạm vắng', 'giấy tạm vắng', 'khai báo tạm vắng'],
+      'thường trú': ['thường trú', 'đăng ký thường trú', 'hộ khẩu', 'sổ hộ khẩu', 'KT2'],
+      'khai sinh': ['khai sinh', 'giấy khai sinh', 'đăng ký khai sinh'],
+      'khai tử': ['khai tử', 'giấy khai tử', 'đăng ký khai tử'],
+      'đăng ký kết hôn': ['kết hôn', 'đăng ký kết hôn', 'giấy chứng nhận kết hôn'],
+      'ly hôn': ['ly hôn', 'giải quyết ly hôn', 'thủ tục ly hôn'],
+      'cấp giấy phép': ['giấy phép', 'cấp phép', 'giấy phép xây dựng', 'giấy phép kinh doanh'],
+      'hành chính': ['hành chính', 'thủ tục hành chính', 'dịch vụ công', 'cổng dịch vụ công'],
+      'giấy tờ': ['giấy tờ', 'hồ sơ', 'thủ tục', 'giấy phép'],
+      'lệ phí': ['lệ phí', 'phí', 'tiền lệ phí', 'thu phí'],
+      'thời gian': ['thời gian', 'thời hạn', 'thủ tục', 'giải quyết'],
+      'nơi cư trú': ['nơi cư trú', 'địa chỉ', 'chỗ ở', 'hộ khẩu'],
+      'chứng minh': ['chứng minh', 'xác nhận', 'xác thực', 'chứng thực'],
+      'ủy quyền': ['ủy quyền', 'ủy nhiệm', 'ủy thác', 'giấy ủy quyền'],
+      'xác nhận': ['xác nhận', 'xác thực', 'chứng thực', 'xác minh'],
+    };
+
+    let enhancedQuery = query.toLowerCase();
+
+    // Expand query with related terms
+    for (const [mainTerm, relatedTerms] of Object.entries(termMappings)) {
+      if (enhancedQuery.includes(mainTerm)) {
+        // Add related terms to the query for better matching
+        relatedTerms.forEach(term => {
+          if (!enhancedQuery.includes(term)) {
+            enhancedQuery += ` ${term}`;
+          }
+        });
+      }
+    }
+
+    return enhancedQuery;
   }
 
   /** Vector search */

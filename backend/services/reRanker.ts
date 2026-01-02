@@ -17,53 +17,60 @@ export async function reRankResults(
   try {
     console.log(`[ReRanker] 🚀 Re-ranking ${chunks.length} chunks...`);
 
+    // Try to use cross-encoder model for re-ranking
     const pairs = chunks.map((chunk) => ({
       text_a: query,
       text_b: chunk.content,
     }));
 
-    // textClassification in @huggingface/inference usually takes a string or array of strings.
-    // If the library expects a string for a single classification, we might need to format it differently
-    // or use a different method. However, for batch processing, we can often pass an array of strings
-    // representing the pairs if the model supports it, or just the text.
-    // Since the provided code passed objects, we'll assume the user might be using a custom wrapper or
-    // we should format it as a string if strictly typed.
-    // Safest approach for cross-encoder score is usually passing the pair as a string "query <sep> document"
-    // But to strictly follow the user's code request, I'll try to adapt to the library's reality.
+    // Cross-encoder models typically work differently - they expect pairs of text
+    // For batch processing, we need to handle this differently
+    // Let's process each pair individually to avoid issues with the API
+    const ranked = [];
 
-    // The library @huggingface/inference v4.13.5 textClassification:
-    // inputs: string | string[]
-    // So we must pass strings.
-    const inputs = pairs.map((p) => `${p.text_a} [SEP] ${p.text_b}`);
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const input = `${query} [SEP] ${chunk.content}`;
 
-    const results = await hfClient.textClassification({
-      model: "cross-encoder/ms-marco-MiniLM-L-6-v2",
-      inputs: inputs as any, // Casting to any if types mismatch due to library version specifics, or strictly string[]
-    });
+      try {
+        const result = await hfClient.textClassification({
+          model: "cross-encoder/ms-marco-MiniLM-L-6-v2",
+          inputs: input,
+        });
 
-    // Result structure: Array<{ label: string, score: number }>
-    // Since we passed an array, results is an array of arrays (one per input).
-    // Wait, if inputs is array, results is array of results.
-    // If results is array of arrays (batch), we map accordingly.
+        // Extract score from the result - textClassification returns different structures
+        let score = 0;
+        if (Array.isArray(result) && result[0]) {
+          // If result is an array of classification results, take the first one
+          const firstResult = result[0];
+          // The result typically has label and score properties
+          score = typeof firstResult === 'object' && 'score' in firstResult ? firstResult.score : 0;
+        } else if (Array.isArray(result)) {
+          // If it's a simple array, try to get the score from the first element
+          score = result.length > 0 && typeof result[0] === 'object' && 'score' in result[0]
+            ? result[0].score
+            : 0;
+        }
 
-    const scores = Array.isArray(results[0])
-      ? (results as any)[0]
-      : (results as any[]);
-
-    const ranked = chunks
-      .map((chunk, i) => {
-        const score = scores[i]?.score ?? 0;
-        return {
+        ranked.push({
           ...chunk,
           similarity: (chunk.similarity + score) / 2,
-        };
-      })
-      .sort((a, b) => b.similarity - a.similarity);
+        });
+      } catch (singleError: any) {
+        console.warn(`[ReRanker] ⚠️ Single item re-ranking failed for chunk ${i}:`, singleError.message);
+        // If individual re-ranking fails, keep the original chunk with its similarity
+        ranked.push(chunk);
+      }
+    }
+
+    // Sort by similarity
+    ranked.sort((a, b) => b.similarity - a.similarity);
 
     console.log(`[ReRanker] ✅ Re-ranking complete.`);
     return ranked;
   } catch (err) {
-    console.error("[ReRanker] ⚠️ Error re-ranking:", err);
-    return chunks;
+    console.error("[ReRanker] ⚠️ Unexpected error during re-ranking:", err);
+    // If there's a major error, return original chunks sorted by similarity
+    return chunks.sort((a, b) => b.similarity - a.similarity);
   }
 }
