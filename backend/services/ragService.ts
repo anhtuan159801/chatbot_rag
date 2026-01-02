@@ -59,11 +59,11 @@ export class RAGService {
       // Check dimension integrity
       const dim = await checkVectorDimension(
         "knowledge_chunks",
-        "content_vector",
+        "embedding",
       );
-      if (dim && dim !== 4096)
+      if (dim && dim !== 384)
         console.warn(
-          `[RAG] ⚠️ Vector dimension mismatch (DB=${dim}, expected=4096)`,
+          `[RAG] ⚠️ Vector dimension mismatch (DB=${dim}, expected=384)`,
         );
 
       // Perform hybrid search

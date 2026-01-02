@@ -290,8 +290,8 @@ export const initializeSystemData = async (): Promise<void> => {
 };
 
 export async function checkVectorDimension(
-  table: string,
-  column: string,
+  table: string = "knowledge_chunks",
+  column: string = "embedding",
 ): Promise<number | null> {
   try {
     const client = await getClient();
@@ -317,9 +317,10 @@ export async function searchByVector(
   try {
     const client = await getClient();
     if (!client) return [];
-    const embeddingStr = embedding.join(",");
-    const query = `SELECT id, content, metadata, 1 - (content_vector <=> cube(array[${embeddingStr}])) AS similarity FROM knowledge_chunks ORDER BY content_vector <=> cube(array[${embeddingStr}]) LIMIT $1;`;
-    const { rows } = await client.query(query, [topK]);
+    const embeddingStr = `{${embedding.join(",")}}`;
+    // Using cosine distance converted to similarity (1 - distance), so higher = more similar
+    const query = `SELECT id, content, metadata, (1 - (embedding <=> $2)) AS similarity FROM knowledge_chunks ORDER BY embedding <=> $2 LIMIT $1;`;
+    const { rows } = await client.query(query, [topK, embeddingStr]);
     return rows || [];
   } catch (err: any) {
     console.error("[Supabase] ❌ Vector search failed:", err.message);

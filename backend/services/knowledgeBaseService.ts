@@ -377,12 +377,12 @@ async function processDocumentAsync(
         if (embedding && pg && hasVectorSupport) {
           try {
             await pg.query(
-              `INSERT INTO knowledge_chunks (knowledge_base_id, content, content_vector, chunk_index, metadata)
+              `INSERT INTO knowledge_chunks (knowledge_base_id, content, embedding, chunk_index, metadata)
                VALUES ($1, $2, $3, $4, $5)`,
               [
                 documentId,
                 chunksWithMetadata[i].text,
-                `[${embedding.join(",")}]`,
+                `{${embedding.join(",")}}`,
                 chunksWithMetadata[i].index,
                 JSON.stringify(chunksWithMetadata[i].metadata),
               ],
@@ -391,16 +391,16 @@ async function processDocumentAsync(
           } catch (vectorError: any) {
             if (
               vectorError.code === "42703" ||
-              vectorError.message?.includes("content_vector")
+              vectorError.message?.includes("embedding")
             ) {
               console.warn(
-                "[PROCESSING] ⚠ content_vector column not found, storing text without vector",
+                "[PROCESSING] ⚠ embedding column not found, storing text without vector",
               );
               hasVectorSupport = false;
             } else if (
               vectorError.code === "22P02" ||
               vectorError.message?.includes(
-                "invalid input syntax for type cube",
+                "invalid input syntax for type vector"
               )
             ) {
               console.warn(
@@ -541,12 +541,12 @@ async function processWebPageAsync(documentId: string, url: string) {
         if (embedding && pg && hasVectorSupport) {
           try {
             await pg.query(
-              `INSERT INTO knowledge_chunks (knowledge_base_id, content, content_vector, chunk_index, metadata)
+              `INSERT INTO knowledge_chunks (knowledge_base_id, content, embedding, chunk_index, metadata)
                VALUES ($1, $2, $3, $4, $5)`,
               [
                 documentId,
                 chunksWithMetadata[i].text,
-                `[${embedding.join(",")}]`,
+                `{${embedding.join(",")}}`,
                 chunksWithMetadata[i].index,
                 JSON.stringify(chunksWithMetadata[i].metadata),
               ],
@@ -555,16 +555,16 @@ async function processWebPageAsync(documentId: string, url: string) {
           } catch (vectorError: any) {
             if (
               vectorError.code === "42703" ||
-              vectorError.message?.includes("content_vector")
+              vectorError.message?.includes("embedding")
             ) {
               console.warn(
-                "[PROCESSING] ⚠ content_vector column not found, storing text without vector",
+                "[PROCESSING] ⚠ embedding column not found, storing text without vector",
               );
               hasVectorSupport = false;
             } else if (
               vectorError.code === "22P02" ||
               vectorError.message?.includes(
-                "invalid input syntax for type cube",
+                "invalid input syntax for type vector"
               )
             ) {
               console.warn(
