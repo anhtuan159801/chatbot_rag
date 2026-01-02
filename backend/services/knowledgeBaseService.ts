@@ -382,7 +382,7 @@ async function processDocumentAsync(
               [
                 documentId,
                 chunksWithMetadata[i].text,
-                `{${embedding.join(",")}}`,
+                embedding,
                 chunksWithMetadata[i].index,
                 JSON.stringify(chunksWithMetadata[i].metadata),
               ],
@@ -546,7 +546,7 @@ async function processWebPageAsync(documentId: string, url: string) {
               [
                 documentId,
                 chunksWithMetadata[i].text,
-                `{${embedding.join(",")}}`,
+                embedding,
                 chunksWithMetadata[i].index,
                 JSON.stringify(chunksWithMetadata[i].metadata),
               ],

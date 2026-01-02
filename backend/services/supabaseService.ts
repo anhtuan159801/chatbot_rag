@@ -317,10 +317,9 @@ export async function searchByVector(
   try {
     const client = await getClient();
     if (!client) return [];
-    const embeddingStr = `{${embedding.join(",")}}`;
-    // Using cosine distance converted to similarity (1 - distance), so higher = more similar
+    // Using array format for PostgreSQL vector extension
     const query = `SELECT id, content, metadata, (1 - (embedding <=> $2)) AS similarity FROM knowledge_chunks ORDER BY embedding <=> $2 LIMIT $1;`;
-    const { rows } = await client.query(query, [topK, embeddingStr]);
+    const { rows } = await client.query(query, [topK, embedding]);
     return rows || [];
   } catch (err: any) {
     console.error("[Supabase] ❌ Vector search failed:", err.message);
