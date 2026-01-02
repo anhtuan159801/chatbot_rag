@@ -271,6 +271,17 @@ export class RAGService {
 
   formatContext(chunks: KnowledgeChunk[]): string {
     if (chunks.length === 0) return "";
+    // Extract all unique URLs from the chunks
+    const urls = new Set<string>();
+    chunks.forEach(chunk => {
+      if (chunk.metadata?.content_url) urls.add(chunk.metadata.content_url);
+      if (chunk.metadata?.source) urls.add(chunk.metadata.source);
+    });
+
+    const urlsText = urls.size > 0
+      ? `\n\n=== CÁC NGUỒN THAM KHẢO ===\n${Array.from(urls).map((url, i) => `${i + 1}. ${url}`).join('\n')}\n=== HẾT NGUỒN THAM KHẢO ===\n`
+      : '';
+
     return `=== THÔNG TIN TÌM THẤY TỪ CƠ SỞ DỮ LIỆU ===\n\n${chunks
       .map((chunk, index) => {
         const sourceUrl =
@@ -279,6 +290,6 @@ export class RAGService {
         const similarityInfo = `\n(Độ liên quan: ${(chunk.similarity * 100).toFixed(1)}%)`;
         return `[TÀI LIỆU ${index + 1} - ĐỘ LIÊN QUAN CAO]:\n${chunk.content}${sourceInfo}${similarityInfo}\n`;
       })
-      .join("\n")}\n=== HẾT THÔNG TIN TÌM THẤY ===`;
+      .join("\n")}${urlsText}=== HẾT THÔNG TIN TÌM THẤY ===`;
   }
 }
