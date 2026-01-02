@@ -318,6 +318,7 @@ export async function searchByVector(
     const client = await getClient();
     if (!client) return [];
     // Convert embedding array to comma-separated string and use PostgreSQL's string_to_array function
+    // Use proper similarity calculation: 1 - cosine_distance, which gives 1 for identical vectors and approaches 0 for dissimilar
     const embeddingStr = embedding.join(',');
     const query = `
       SELECT id, content, metadata, (1 - (embedding <=> string_to_array($1, ',')::float4[]::vector)) AS similarity

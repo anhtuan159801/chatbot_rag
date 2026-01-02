@@ -27,18 +27,16 @@ async function reembedKnowledgeBase() {
     const chunksResult = await client.query(`
       SELECT id, content, knowledge_base_id, chunk_index
       FROM knowledge_chunks
-      WHERE embedding IS NULL
       ORDER BY knowledge_base_id, chunk_index
-      LIMIT 100
     `);
 
     if (chunksResult.rows.length === 0) {
-      console.log('✓ All chunks have embeddings. Nothing to do.');
+      console.log('✓ No chunks found in the database.');
       await client.end();
       return;
     }
 
-    console.log(`📊 Found ${chunksResult.rows.length} chunks without embeddings\n`);
+    console.log(`📊 Found ${chunksResult.rows.length} chunks to re-embed\n`);
     console.log('⏳ Processing chunks...\n');
 
     const hfClient = new InferenceClient(process.env.HUGGINGFACE_API_KEY);
@@ -71,10 +69,10 @@ async function reembedKnowledgeBase() {
         await client.query(
           `
           UPDATE knowledge_chunks
-          SET embedding = $1::vector
+          SET embedding = string_to_array($1, ',')::float4[]::vector
           WHERE id = $2
         `,
-          [`[${embeddingArray.join(',')}]`, chunk.id]
+          [embeddingArray.join(','), chunk.id]
         );
 
         successCount++;

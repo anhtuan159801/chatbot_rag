@@ -33,6 +33,9 @@ async function validateEmbeddingDimensions() {
       const dims = row.dimensions;
       dimensionCounts.set(dims, (dimensionCounts.get(dims) || 0) + 1);
 
+      // Expected dimensions based on the model being used
+      // BAAI/bge-small-en-v1.5 has 384 dimensions
+      // BAAI/bge-m3 has 1024 dimensions
       if (dims !== 384 && dims !== 1024) {
         console.log(`⚠️  Chunk ${row.id} has ${dims} dimensions (expected 384 or 1024)`);
       }

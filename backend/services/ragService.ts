@@ -27,6 +27,7 @@ export interface KnowledgeChunk {
 export class RAGService {
   private readonly VECTOR_WEIGHT = 0.7;
   private readonly KEYWORD_WEIGHT = 0.3;
+  private readonly MIN_SIMILARITY = parseFloat(process.env.MIN_SIMILARITY || '0.3'); // Lower threshold for better recall
   private readonly CACHE_TTL = 300_000; // 5 minutes
   private hfClient: InferenceClient;
 
@@ -146,12 +147,15 @@ export class RAGService {
         (item.source === "vector" ? this.VECTOR_WEIGHT : 0) * item.similarity +
         (item.source === "keyword" ? this.KEYWORD_WEIGHT : 0) * item.similarity;
 
-      merged.push({
-        ...item,
-        similarity: score,
-        source: "hybrid",
-        content: this.cleanText(item.content),
-      });
+      // Only add items that meet the minimum similarity threshold
+      if (score >= this.MIN_SIMILARITY) {
+        merged.push({
+          ...item,
+          similarity: score,
+          source: "hybrid",
+          content: this.cleanText(item.content),
+        });
+      }
     }
 
     return merged.sort((a, b) => b.similarity - a.similarity).slice(0, topK);

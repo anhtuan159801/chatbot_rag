@@ -1,10 +1,10 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "ES2020",
+    "module": "ESNext",
     "moduleResolution": "bundler",
-    "outDir": "./dist",
-    "rootDir": "./",
+    "outDir": "./dist-server",
+    "rootDir": "../",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -18,16 +18,7 @@
     "services/**/*.ts",
     "middleware/**/*.ts",
     "src/**/*.ts",
-    "scripts/**/*.ts",
-    "shared/**/*.ts"
+    "scripts/**/*.ts"
   ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "dist-server"
-  ]
-}
-  },
-  "include": ["server.ts", "services/**/*.ts", "../shared/**/*.ts"],
   "exclude": ["node_modules", "dist", "dist-server"]
 }

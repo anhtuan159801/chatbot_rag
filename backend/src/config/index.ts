@@ -30,6 +30,10 @@ export const config = {
       apiKey: process.env.HUGGINGFACE_API_KEY || '',
       embeddingModel: process.env.EMBEDDING_MODEL || 'BAAI/bge-small-en-v1.5',
     },
+    embedding: {
+      provider: process.env.EMBEDDING_PROVIDER || 'huggingface',
+      model: process.env.EMBEDDING_MODEL || 'BAAI/bge-small-en-v1.5',
+    },
   },
   auth: {
     jwtSecret: process.env.JWT_SECRET || 'change-me-in-production',
