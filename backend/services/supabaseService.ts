@@ -8,22 +8,23 @@
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 
-// Detect Supabase project URL (should be https://xxx.supabase.co)
 const envSupabaseUrl = process.env.SUPABASE_URL;
-// Detect Supabase anon key
 const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY;
-// Database connection string - prioritize direct DB URL, fallback to Supabase URL if it looks like a DB string
 let dbUrl = process.env.SUPABASE_DB_URL;
 if (!dbUrl && envSupabaseUrl && envSupabaseUrl.startsWith("postgresql://")) {
   dbUrl = envSupabaseUrl;
   console.log("[Supabase] Detected database URL from SUPABASE_URL");
 }
 
-// Initialize Supabase client only if we have a valid project URL
 let supabase: ReturnType<typeof createClient> | null = null;
 if (envSupabaseUrl && envSupabaseUrl.startsWith("http") && supabaseKey) {
-  supabase = createClient(envSupabaseUrl, supabaseKey);
-  console.log("[Supabase] ✅ Supabase client initialized");
+  try {
+    supabase = createClient(envSupabaseUrl, supabaseKey);
+    console.log("[Supabase] ✅ Supabase client initialized");
+  } catch (err) {
+    console.warn("[Supabase] ⚠️ Failed to create Supabase client:", err);
+    supabase = null;
+  }
 } else if (envSupabaseUrl && !envSupabaseUrl.startsWith("http")) {
   console.warn(
     "[Supabase] ⚠️ SUPABASE_URL format invalid. Expected https://xxx.supabase.co",
@@ -49,22 +50,32 @@ function initDatabase(): Promise<void> {
       const client = new Client({
         connectionString: dbUrl,
         connectionTimeoutMillis: 30000,
+        keepAlive: true,
+      });
+
+      client.on("error", (err) => {
+        console.error("[Supabase] Database connection error:", err.message);
+        pgClient = null;
+        connectionPromise = null;
       });
 
       await client.connect();
       console.log("[Supabase] ✅ Connected to PostgreSQL database");
       pgClient = client;
-    } catch (err) {
-      console.error("[Supabase] ❌ Failed to connect to PostgreSQL:", err);
+    } catch (err: any) {
+      console.error(
+        "[Supabase] ❌ Failed to connect to PostgreSQL:",
+        err.message,
+      );
       pgClient = null;
-      throw err; // Propagate error so caller knows
+      connectionPromise = null;
+      throw err;
     }
   })();
 
   return connectionPromise;
 }
 
-// Start initialization immediately
 initDatabase().catch(() => {});
 
 export interface KnowledgeChunkResult {
@@ -74,32 +85,46 @@ export interface KnowledgeChunkResult {
   similarity: number;
 }
 
-// Helper to get client, waiting for connection if needed
 async function getDbClient(): Promise<Client | null> {
   if (!pgClient) {
     console.log("[Supabase] Waiting for database connection...");
     try {
       await initDatabase();
-    } catch (e) {
-      console.error("[Supabase] Failed to connect:", e);
+    } catch (e: any) {
+      console.error("[Supabase] Failed to connect:", e.message);
       return null;
     }
   }
-  return pgClient;
+
+  if (!pgClient) {
+    console.error(
+      "[Supabase] pgClient is still null after initialization attempt",
+    );
+    return null;
+  }
+
+  try {
+    await pgClient.query("SELECT 1");
+    return pgClient;
+  } catch (err: any) {
+    console.error("[Supabase] Database connection test failed:", err.message);
+    pgClient = null;
+    connectionPromise = null;
+    return null;
+  }
 }
 
-// --- Existing Config & Model Management Functions ---
 export const getConfig = async (key: string): Promise<any | null> => {
-  const client = await getClient();
-  if (!client) return null;
   try {
+    const client = await getClient();
+    if (!client) return null;
     const result = await client.query(
       "SELECT value FROM system_configs WHERE key = $1",
       [key],
     );
     return result.rows[0]?.value ?? null;
-  } catch (error) {
-    console.error(`Error getting config for key '${key}':`, error);
+  } catch (error: any) {
+    console.error(`Error getting config for key '${key}':`, error.message);
     return null;
   }
 };
@@ -108,9 +133,9 @@ export const updateConfig = async (
   key: string,
   value: any,
 ): Promise<boolean> => {
-  const client = await getClient();
-  if (!client) return false;
   try {
+    const client = await getClient();
+    if (!client) return false;
     const jsonValue = JSON.stringify(value);
     const checkResult = await client.query(
       "SELECT key FROM system_configs WHERE key = $1",
@@ -129,22 +154,22 @@ export const updateConfig = async (
       );
     }
     return true;
-  } catch (error) {
-    console.error(`Error updating config for key '${key}':`, error);
+  } catch (error: any) {
+    console.error(`Error updating config for key '${key}':`, error.message);
     return false;
   }
 };
 
 export const getModels = async (): Promise<any[]> => {
-  const client = await getClient();
-  if (!client) return [];
   try {
+    const client = await getClient();
+    if (!client) return [];
     const result = await client.query(
       "SELECT id, provider, name, model_string, api_key, is_active FROM ai_models ORDER BY name ASC",
     );
     return result.rows;
-  } catch (error) {
-    console.error("Error getting AI models:", error);
+  } catch (error: any) {
+    console.error("Error getting AI models:", error.message);
     return [];
   }
 };
@@ -152,13 +177,13 @@ export const getModels = async (): Promise<any[]> => {
 export const updateModels = async (
   models: any[],
 ): Promise<{ success: boolean; error?: string }> => {
-  const client = await getClient();
-  if (!client)
-    return {
-      success: false,
-      error: "Database not connected. Please wait a moment and try again.",
-    };
   try {
+    const client = await getClient();
+    if (!client)
+      return {
+        success: false,
+        error: "Database not connected. Please wait a moment and try again.",
+      };
     await client.query("BEGIN");
     for (const model of models) {
       const apiKey =
@@ -184,18 +209,18 @@ export const updateModels = async (
     }
     await client.query("COMMIT");
     return { success: true };
-  } catch (e) {
+  } catch (e: any) {
     try {
-      await client.query("ROLLBACK");
+      await (await getClient())?.query("ROLLBACK");
     } catch {}
     return { success: false, error: String(e) };
   }
 };
 
 export const getAiRoles = async (): Promise<Record<string, string>> => {
-  const client = await getClient();
-  if (!client) return {};
   try {
+    const client = await getClient();
+    if (!client) return {};
     const result = await client.query(
       "SELECT role_key, model_id FROM ai_role_assignments",
     );
@@ -204,8 +229,8 @@ export const getAiRoles = async (): Promise<Record<string, string>> => {
       roles[item.role_key] = item.model_id;
     });
     return roles;
-  } catch (error) {
-    console.error("Error getting AI role assignments:", error);
+  } catch (error: any) {
+    console.error("Error getting AI role assignments:", error.message);
     return {};
   }
 };
@@ -213,9 +238,9 @@ export const getAiRoles = async (): Promise<Record<string, string>> => {
 export const updateAiRoles = async (
   roles: Record<string, string>,
 ): Promise<boolean> => {
-  const client = await getClient();
-  if (!client) return false;
   try {
+    const client = await getClient();
+    if (!client) return false;
     await client.query("DELETE FROM ai_role_assignments");
     for (const [key, val] of Object.entries(roles)) {
       await client.query(
@@ -224,16 +249,16 @@ export const updateAiRoles = async (
       );
     }
     return true;
-  } catch (error) {
-    console.error("Error updating AI roles:", error);
+  } catch (error: any) {
+    console.error("Error updating AI roles:", error.message);
     return false;
   }
 };
 
 export const initializeSystemData = async (): Promise<void> => {
-  const client = await getClient();
-  if (!client) return;
   try {
+    const client = await getClient();
+    if (!client) return;
     const configCount = await client.query(
       "SELECT COUNT(*) FROM system_configs",
     );
@@ -259,27 +284,28 @@ export const initializeSystemData = async (): Promise<void> => {
         [c.key, JSON.stringify(c.value), new Date().toISOString()],
       );
     }
-  } catch (e) {
-    console.error("Error initializing system data:", e);
+  } catch (e: any) {
+    console.error("Error initializing system data:", e.message);
   }
 };
-
-// --- Vector & Keyword Search Functions ---
 
 export async function checkVectorDimension(
   table: string,
   column: string,
 ): Promise<number | null> {
-  const client = await getClient();
-  if (!client) return null;
   try {
+    const client = await getClient();
+    if (!client) return null;
     const res = await client.query(
       `SELECT attndims FROM pg_attribute WHERE attrelid = $1::regclass AND attname = $2;`,
       [table, column],
     );
     return res.rows[0]?.attndims ?? null;
-  } catch (err) {
-    console.error("[Supabase] ⚠️ Error checking vector dimension:", err);
+  } catch (err: any) {
+    console.error(
+      "[Supabase] ⚠️ Error checking vector dimension:",
+      err.message,
+    );
     return null;
   }
 }
@@ -288,15 +314,15 @@ export async function searchByVector(
   embedding: number[],
   topK: number = 5,
 ): Promise<KnowledgeChunkResult[]> {
-  const client = await getClient();
-  if (!client) return [];
   try {
+    const client = await getClient();
+    if (!client) return [];
     const embeddingStr = embedding.join(",");
     const query = `SELECT id, content, metadata, 1 - (content_vector <=> cube(array[${embeddingStr}])) AS similarity FROM knowledge_chunks ORDER BY content_vector <=> cube(array[${embeddingStr}]) LIMIT $1;`;
     const { rows } = await client.query(query, [topK]);
     return rows || [];
-  } catch (err) {
-    console.error("[Supabase] ❌ Vector search failed:", err);
+  } catch (err: any) {
+    console.error("[Supabase] ❌ Vector search failed:", err.message);
     return [];
   }
 }
@@ -321,15 +347,23 @@ export async function searchByKeywords(
         similarity: 0.6,
       })) ?? []
     );
-  } catch (err) {
-    console.error("[Supabase] ❌ Keyword search error:", err);
+  } catch (err: any) {
+    console.error("[Supabase] ❌ Keyword search error:", err.message);
     return [];
   }
 }
 
-// Export client accessor for other services
 export async function getClient(): Promise<Client | null> {
   return getDbClient();
 }
 
-export default { initDatabase, getClient };
+export function isConnected(): boolean {
+  return pgClient !== null && typeof pgClient.query === "function";
+}
+
+export default {
+  initDatabase,
+  getClient,
+  isConnected,
+  initializeSystemData,
+};

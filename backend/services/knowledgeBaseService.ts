@@ -17,10 +17,36 @@ const upload = multer({
   },
 });
 
+async function getDbClient() {
+  try {
+    const client = await getClient();
+    return client;
+  } catch (error) {
+    console.error("Failed to get database client:", error);
+    return null;
+  }
+}
+
+async function safeQuery(query: string, params: any[] = []) {
+  const pg = await getDbClient();
+  if (!pg) {
+    throw new Error("Database not connected");
+  }
+  return pg.query(query, params);
+}
+
+async function safeQueryNoReturn(query: string, params: any[] = []) {
+  const pg = await getDbClient();
+  if (!pg) {
+    throw new Error("Database not connected");
+  }
+  return pg.query(query, params);
+}
+
 // GET /api/knowledge-base - Get all knowledge base documents
 router.get("/knowledge-base", async (req, res) => {
   try {
-    const pg = await getClient();
+    const pg = await getDbClient();
     if (!pg) {
       return res.status(500).json({ error: "Database not connected" });
     }
@@ -42,8 +68,8 @@ router.get("/knowledge-base", async (req, res) => {
     }));
 
     res.json(documents);
-  } catch (error) {
-    console.error("Error fetching knowledge base:", error);
+  } catch (error: any) {
+    console.error("Error fetching knowledge base:", error.message);
     res.status(500).json({ error: "Failed to fetch knowledge base" });
   }
 });
@@ -63,25 +89,22 @@ router.post(
       const documentType = type || getFileType(req.file.originalname);
       const size = (req.file.size / 1024 / 1024).toFixed(2) + " MB";
 
-      const pg = await getClient();
+      const pg = await getDbClient();
       if (!pg) {
         return res.status(500).json({ error: "Database not connected" });
       }
 
-      // Generate unique document ID (valid UUID)
       const documentId = crypto.randomUUID();
 
-      // Insert document with PENDING status
       const result = await pg.query(
         `INSERT INTO knowledge_base (id, name, type, size, content_url, status)
-       VALUES ($1, $2, $3, $4, $5, 'PENDING')
-       RETURNING id, name, type, status, upload_date, vector_count, size, content_url`,
+         VALUES ($1, $2, $3, $4, $5, 'PENDING')
+         RETURNING id, name, type, status, upload_date, vector_count, size, content_url`,
         [documentId, documentName, documentType, size, null],
       );
 
       const document = result.rows[0];
 
-      // Start async processing (extract text, chunk, embed, store)
       processDocumentAsync(documentId, documentName, req.file).catch((err) => {
         console.error("ERROR processing document:", err);
         updateDocumentStatus(documentId, "FAILED");
@@ -96,8 +119,8 @@ router.post(
         vectorCount: document.vector_count,
         size: document.size,
       });
-    } catch (error) {
-      console.error("Error uploading document:", error);
+    } catch (error: any) {
+      console.error("Error uploading document:", error.message);
       res.status(500).json({ error: "Failed to upload document" });
     }
   },
@@ -112,15 +135,13 @@ router.post("/knowledge-base/crawl", async (req, res) => {
       return res.status(400).json({ error: "URL is required" });
     }
 
-    const pg = await getClient();
+    const pg = await getDbClient();
     if (!pg) {
       return res.status(500).json({ error: "Database not connected" });
     }
 
-    // Generate unique document ID (valid UUID)
     const documentId = crypto.randomUUID();
 
-    // Insert document with PENDING status
     const result = await pg.query(
       `INSERT INTO knowledge_base (id, name, type, size, content_url, status)
        VALUES ($1, $2, $3, $4, $5, 'PENDING')
@@ -130,7 +151,6 @@ router.post("/knowledge-base/crawl", async (req, res) => {
 
     const document = result.rows[0];
 
-    // Start async processing (crawl, chunk, embed, store)
     processWebPageAsync(documentId, url).catch((err) => {
       console.error("Error processing webpage:", err);
       updateDocumentStatus(documentId, "FAILED");
@@ -145,8 +165,8 @@ router.post("/knowledge-base/crawl", async (req, res) => {
       vectorCount: document.vector_count,
       size: document.size,
     });
-  } catch (error) {
-    console.error("Error crawling webpage:", error);
+  } catch (error: any) {
+    console.error("Error crawling webpage:", error.message);
     res.status(500).json({ error: "Failed to crawl webpage" });
   }
 });
@@ -156,27 +176,29 @@ router.delete("/knowledge-base/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    const pg = await getClient();
+    const pg = await getDbClient();
     if (!pg) {
       return res.status(500).json({ error: "Database not connected" });
     }
 
-    // Get document info first to delete the file
     const docResult = await pg.query(
       "SELECT content_url FROM knowledge_base WHERE id = $1",
       [id],
     );
 
     if (docResult.rows.length > 0 && docResult.rows[0].content_url) {
-      await storageService.deleteFile(docResult.rows[0].content_url);
+      try {
+        await storageService.deleteFile(docResult.rows[0].content_url);
+      } catch (e) {
+        console.warn(`Failed to delete file: ${docResult.rows[0].content_url}`);
+      }
     }
 
-    // Delete document (this will cascade delete chunks)
     await pg.query("DELETE FROM knowledge_base WHERE id = $1", [id]);
 
     res.json({ success: true, message: "Document deleted successfully" });
-  } catch (error) {
-    console.error("Error deleting document:", error);
+  } catch (error: any) {
+    console.error("Error deleting document:", error.message);
     res.status(500).json({ error: "Failed to delete document" });
   }
 });
@@ -184,17 +206,15 @@ router.delete("/knowledge-base/:id", async (req, res) => {
 // DELETE /api/knowledge-base/delete-all - Delete all knowledge base data
 router.delete("/knowledge-base/delete-all", async (req, res) => {
   try {
-    const pg = await getClient();
+    const pg = await getDbClient();
     if (!pg) {
       return res.status(500).json({ error: "Database not connected" });
     }
 
-    // Get all documents to delete files from storage
     const docsResult = await pg.query(
       "SELECT id, content_url FROM knowledge_base",
     );
 
-    // Delete files from storage
     for (const row of docsResult.rows) {
       if (row.content_url) {
         try {
@@ -205,39 +225,36 @@ router.delete("/knowledge-base/delete-all", async (req, res) => {
       }
     }
 
-    // Delete all chunks (cascade) and documents
     await pg.query("TRUNCATE knowledge_base CASCADE");
 
     res.json({
       success: true,
       message: "All knowledge base data deleted successfully",
     });
-  } catch (error) {
-    console.error("Error deleting all knowledge base:", error);
+  } catch (error: any) {
+    console.error("Error deleting all knowledge base:", error.message);
     res.status(500).json({ error: "Failed to delete all knowledge base" });
   }
 });
 
-// Async function to process uploaded document (extract, chunk, embed, store)
 async function processDocumentAsync(
   documentId: string,
   name: string,
   file: Express.Multer.File,
 ) {
+  let pg = null;
   try {
     console.log(`[PROCESSING] Starting for document: ${name} (${documentId})`);
 
-    const pg = await getClient();
+    pg = await getDbClient();
     if (!pg) {
       console.error("[PROCESSING] ERROR: pg is null, cannot process document");
       throw new Error("Database connection not available");
     }
 
-    // Update status to PROCESSING
     await updateDocumentStatus(documentId, "PROCESSING");
     console.log(`[PROCESSING] Status updated to PROCESSING for: ${name}`);
 
-    // Save file to storage (graceful fallback if storage fails)
     let storedFile: any = { url: null, path: null };
     try {
       storedFile = await storageService.saveFile(file, documentId);
@@ -249,41 +266,67 @@ async function processDocumentAsync(
       storedFile = { url: null, path: null };
     }
 
-    // Update content_url in database
     if (storedFile.url) {
-      await pg.query(
+      await safeQuery(
         "UPDATE knowledge_base SET content_url = $1 WHERE id = $2",
         [storedFile.url, documentId],
       );
       console.log(`[PROCESSING] Database updated with content_url`);
     }
 
-    // Get local file path for extraction
-    const filePath = await storageService.getLocalFilePath(storedFile.path);
-    console.log(`[PROCESSING] Getting local file path: ${filePath}`);
+    let filePath: string | null = null;
+    try {
+      if (storedFile.path) {
+        filePath = await storageService.getLocalFilePath(storedFile.path);
+      } else {
+        filePath = null;
+      }
+      console.log(`[PROCESSING] Getting local file path: ${filePath}`);
+    } catch (pathError: any) {
+      console.warn(
+        `[PROCESSING] ⚠ Could not get local file path: ${pathError.message}`,
+      );
+      filePath = null;
+    }
 
-    // Extract text from file
-    console.log(`[PROCESSING] Extracting text from file...`);
-    const extractedText = await textExtractorService.extractFromFile(filePath);
-    console.log(
-      `[PROCESSING] Extracted ${extractedText.metadata.words} words from document`,
-    );
+    if (!filePath) {
+      console.warn(
+        `[PROCESSING] ⚠ No file path available, trying direct buffer extraction`,
+      );
+    }
 
-    if (extractedText.text.trim().length === 0) {
+    let extractedText: any = {
+      text: "",
+      metadata: { words: 0, totalPages: 1 },
+    };
+    try {
+      if (filePath) {
+        extractedText = await textExtractorService.extractFromFile(filePath);
+      } else {
+        throw new Error("No file path available for extraction");
+      }
+      console.log(
+        `[PROCESSING] Extracted ${extractedText.metadata.words} words from document`,
+      );
+    } catch (extractError: any) {
+      console.warn(
+        `[PROCESSING] ⚠ Text extraction failed: ${extractError.message}`,
+      );
+      throw new Error("Text extraction failed");
+    }
+
+    if (!extractedText.text || extractedText.text.trim().length === 0) {
       throw new Error("No text extracted from file");
     }
 
-    // Update status to VECTORIZING
     await updateDocumentStatus(documentId, "VECTORIZING");
     console.log(`[PROCESSING] Status updated to VECTORIZING for: ${name}`);
 
-    // Chunk text using chunking service
     const chunks = chunkingService.chunk(extractedText.text, {
       strategy: "paragraph",
       maxChunkSize: 1500,
     });
 
-    // Add metadata to chunks
     const chunksWithMetadata = chunkingService.addMetadata(chunks, {
       source: name,
       type: "DOCUMENT",
@@ -296,23 +339,28 @@ async function processDocumentAsync(
       `[PROCESSING] Generated ${chunksWithMetadata.length} chunks for: ${name}`,
     );
 
-    // Get the configured embedding model from database
-    const roles = await getAiRoles();
-    const ragModelId = roles.rag;
-    const models = await getModels();
-    const embeddingModel = models.find((m) => m.id === ragModelId);
+    let embeddingModel: any = null;
+    try {
+      const roles = await getAiRoles();
+      const ragModelId = roles.rag;
+      const models = await getModels();
+      embeddingModel = models.find((m) => m.id === ragModelId);
 
-    if (!embeddingModel) {
+      if (!embeddingModel) {
+        console.warn(
+          "[PROCESSING] No embedding model configured, using default HuggingFace model",
+        );
+      } else {
+        console.log(
+          `[PROCESSING] Using embedding model: ${embeddingModel.name} (${embeddingModel.model_string})`,
+        );
+      }
+    } catch (modelError: any) {
       console.warn(
-        "[PROCESSING] No embedding model configured, using default HuggingFace model",
-      );
-    } else {
-      console.log(
-        `[PROCESSING] Using embedding model: ${embeddingModel.name} (${embeddingModel.model_string})`,
+        `[PROCESSING] ⚠ Could not load embedding model: ${modelError.message}`,
       );
     }
 
-    // Generate and store embeddings for each chunk
     let successCount = 0;
     let hasVectorSupport = true;
 
@@ -338,7 +386,6 @@ async function processDocumentAsync(
             );
             successCount++;
           } catch (vectorError: any) {
-            // Check if error is about missing column
             if (
               vectorError.code === "42703" ||
               vectorError.message?.includes("content_vector")
@@ -347,12 +394,24 @@ async function processDocumentAsync(
                 "[PROCESSING] ⚠ content_vector column not found, storing text without vector",
               );
               hasVectorSupport = false;
+            } else if (
+              vectorError.code === "22P02" ||
+              vectorError.message?.includes(
+                "invalid input syntax for type cube",
+              )
+            ) {
+              console.warn(
+                "[PROCESSING] ⚠ Invalid vector format, storing text without vector",
+              );
+              hasVectorSupport = false;
             } else {
-              throw vectorError;
+              console.error(
+                `[PROCESSING] ✗ Vector insert error for chunk ${i + 1}:`,
+                vectorError.message,
+              );
             }
           }
         } else if (!hasVectorSupport && pg) {
-          // Store text without vector
           await pg.query(
             `INSERT INTO knowledge_chunks (knowledge_base_id, content, chunk_index, metadata)
              VALUES ($1, $2, $3, $4)`,
@@ -369,15 +428,14 @@ async function processDocumentAsync(
             `[PROCESSING] ⚠ Failed to generate embedding for chunk ${i + 1}`,
           );
         }
-      } catch (chunkError) {
+      } catch (chunkError: any) {
         console.error(
           `[PROCESSING] ✗ Error processing chunk ${i + 1}:`,
-          chunkError,
+          chunkError.message,
         );
       }
     }
 
-    // Update status based on success count
     let finalStatus = "COMPLETED";
     if (successCount === 0) {
       finalStatus = "FAILED";
@@ -396,9 +454,9 @@ async function processDocumentAsync(
     }
 
     await updateDocumentStatus(documentId, finalStatus, successCount);
-  } catch (error) {
+  } catch (error: any) {
     console.error("[PROCESSING] ✗✗✗ ERROR in processDocumentAsync ✗✗✗");
-    console.error("[PROCESSING] Error details:", error);
+    console.error("[PROCESSING] Error details:", error.message);
     console.error(
       "[PROCESSING] Error stack:",
       error instanceof Error ? error.stack : "No stack trace",
@@ -407,41 +465,43 @@ async function processDocumentAsync(
   }
 }
 
-// Async function to process crawled webpage
 async function processWebPageAsync(documentId: string, url: string) {
+  let pg = null;
   try {
     console.log(`Starting processing for webpage: ${url} (${documentId})`);
 
-    const pg = await getClient();
+    pg = await getDbClient();
     if (!pg) {
       console.error("ERROR: pg is null, cannot process webpage");
       throw new Error("Database connection not available");
     }
 
-    // Update status to PROCESSING
     await updateDocumentStatus(documentId, "PROCESSING");
     console.log(`Status updated to PROCESSING for: ${url}`);
 
-    // Extract text from web
-    console.log(`Extracting text from webpage...`);
-    const extractedText = await textExtractorService.extractFromWeb(url);
-    console.log(`Extracted ${extractedText.metadata.words} words from webpage`);
+    let extractedText: any = { text: "", metadata: { words: 0 } };
+    try {
+      extractedText = await textExtractorService.extractFromWeb(url);
+      console.log(
+        `Extracted ${extractedText.metadata.words} words from webpage`,
+      );
+    } catch (extractError: any) {
+      console.warn(`Webpage extraction failed: ${extractError.message}`);
+      throw new Error("Webpage extraction failed");
+    }
 
-    if (extractedText.text.trim().length === 0) {
+    if (!extractedText.text || extractedText.text.trim().length === 0) {
       throw new Error("No text extracted from webpage");
     }
 
-    // Update status to VECTORIZING
     await updateDocumentStatus(documentId, "VECTORIZING");
     console.log(`Status updated to VECTORIZING for: ${url}`);
 
-    // Chunk text using chunking service
     const chunks = chunkingService.chunk(extractedText.text, {
       strategy: "paragraph",
       maxChunkSize: 1500,
     });
 
-    // Add metadata to chunks
     const chunksWithMetadata = chunkingService.addMetadata(chunks, {
       source: url,
       type: "WEB_CRAWL",
@@ -450,19 +510,22 @@ async function processWebPageAsync(documentId: string, url: string) {
 
     console.log(`Generated ${chunksWithMetadata.length} chunks for: ${url}`);
 
-    // Get the configured embedding model from database
-    const roles = await getAiRoles();
-    const ragModelId = roles.rag;
-    const models = await getModels();
-    const embeddingModel = models.find((m) => m.id === ragModelId);
+    let embeddingModel: any = null;
+    try {
+      const roles = await getAiRoles();
+      const ragModelId = roles.rag;
+      const models = await getModels();
+      embeddingModel = models.find((m) => m.id === ragModelId);
 
-    if (!embeddingModel) {
-      console.warn(
-        "No embedding model configured, using default HuggingFace model",
-      );
+      if (!embeddingModel) {
+        console.warn(
+          "No embedding model configured, using default HuggingFace model",
+        );
+      }
+    } catch (modelError: any) {
+      console.warn(`Could not load embedding model: ${modelError.message}`);
     }
 
-    // Generate and store embeddings for each chunk
     let successCount = 0;
     let hasVectorSupport = true;
     for (let i = 0; i < chunksWithMetadata.length; i++) {
@@ -495,8 +558,21 @@ async function processWebPageAsync(documentId: string, url: string) {
                 "[PROCESSING] ⚠ content_vector column not found, storing text without vector",
               );
               hasVectorSupport = false;
+            } else if (
+              vectorError.code === "22P02" ||
+              vectorError.message?.includes(
+                "invalid input syntax for type cube",
+              )
+            ) {
+              console.warn(
+                "[PROCESSING] ⚠ Invalid vector format, storing text without vector",
+              );
+              hasVectorSupport = false;
             } else {
-              throw vectorError;
+              console.error(
+                `Vector insert error for chunk ${i + 1}:`,
+                vectorError.message,
+              );
             }
           }
         } else if (!hasVectorSupport && pg) {
@@ -516,15 +592,14 @@ async function processWebPageAsync(documentId: string, url: string) {
             `[PROCESSING] ⚠ Failed to generate embedding for chunk ${i + 1}`,
           );
         }
-      } catch (chunkError) {
+      } catch (chunkError: any) {
         console.error(
           `[PROCESSING] ✗ Error processing chunk ${i + 1}:`,
-          chunkError,
+          chunkError.message,
         );
       }
     }
 
-    // Update status based on success count
     let finalStatus = "COMPLETED";
     if (successCount === 0) {
       finalStatus = "FAILED";
@@ -541,45 +616,43 @@ async function processWebPageAsync(documentId: string, url: string) {
     }
 
     await updateDocumentStatus(documentId, finalStatus, successCount);
-  } catch (error) {
-    console.error("Error in processWebPageAsync:", error);
+  } catch (error: any) {
+    console.error("Error in processWebPageAsync:", error.message);
     await updateDocumentStatus(documentId, "FAILED");
   }
 }
 
-// Helper function to update document status
 async function updateDocumentStatus(
   documentId: string,
   status: string,
   vectorCount: number | null = null,
 ) {
-  const pg = await getClient();
-  if (!pg) {
-    console.error("[UPDATE STATUS] ERROR: pg is null, cannot update status");
-    return;
-  }
-
-  const query =
-    vectorCount !== null
-      ? "UPDATE knowledge_base SET status = $1, vector_count = CAST($2 AS integer) WHERE id = $3"
-      : "UPDATE knowledge_base SET status = $1 WHERE id = $2";
-
-  const params =
-    vectorCount !== null
-      ? [status, vectorCount, documentId]
-      : [status, documentId];
-
   try {
+    const pg = await getDbClient();
+    if (!pg) {
+      console.error("[UPDATE STATUS] ERROR: pg is null, cannot update status");
+      return;
+    }
+
+    const query =
+      vectorCount !== null
+        ? "UPDATE knowledge_base SET status = $1, vector_count = CAST($2 AS integer) WHERE id = $3"
+        : "UPDATE knowledge_base SET status = $1 WHERE id = $2";
+
+    const params =
+      vectorCount !== null
+        ? [status, vectorCount, documentId]
+        : [status, documentId];
+
     await pg.query(query, params);
     console.log(
       `[UPDATE STATUS] ${documentId} -> ${status} ${vectorCount !== null ? `(vectors: ${vectorCount})` : ""}`,
     );
-  } catch (error) {
-    console.error("[UPDATE STATUS] ERROR updating status:", error);
+  } catch (error: any) {
+    console.error("[UPDATE STATUS] ERROR updating status:", error.message);
   }
 }
 
-// Helper function to generate embedding using configured model
 async function generateEmbedding(
   text: string,
   embeddingModel?: any,
@@ -640,7 +713,6 @@ async function generateEmbedding(
   }
 }
 
-// Helper function to get file type from extension
 function getFileType(filename: string): string {
   const ext = filename.toLowerCase().split(".").pop();
   const typeMap: Record<string, string> = {
