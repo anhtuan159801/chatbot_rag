@@ -271,13 +271,14 @@ export class RAGService {
 
   formatContext(chunks: KnowledgeChunk[]): string {
     if (chunks.length === 0) return "";
-    return chunks
+    return `=== THÔNG TIN TÌM THẤY TỪ CƠ SỞ DỮ LIỆU ===\n\n${chunks
       .map((chunk, index) => {
         const sourceUrl =
           chunk.metadata?.content_url || chunk.metadata?.source || "";
-        const sourceInfo = sourceUrl ? `\nNguồn: ${sourceUrl}` : "";
-        return `[Kiến thức ${index + 1}]:\n${chunk.content}${sourceInfo}\n`;
+        const sourceInfo = sourceUrl ? `\n(Nguồn: ${sourceUrl})` : "";
+        const similarityInfo = `\n(Độ liên quan: ${(chunk.similarity * 100).toFixed(1)}%)`;
+        return `[TÀI LIỆU ${index + 1} - ĐỘ LIÊN QUAN CAO]:\n${chunk.content}${sourceInfo}${similarityInfo}\n`;
       })
-      .join("\n");
+      .join("\n")}\n=== HẾT THÔNG TIN TÌM THẤY ===`;
   }
 }

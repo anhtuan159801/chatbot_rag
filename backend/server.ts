@@ -566,7 +566,7 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
 
         let prompt = "";
         if (ragContext) {
-          prompt = `${systemPrompt}\n\n${ragContext}\n\nDựa trên các thông tin trên, hãy trả lời câu hỏi của người dùng:\n\nCâu hỏi: ${message_text}\n\nHãy trả lời bằng tiếng Việt, ngắn gọn, dễ hiểu và không sử dụng markdown. Nếu thông tin trên không đủ, hãy nói rõ.`;
+          prompt = `${systemPrompt}\n\n${ragContext}\n\nCâu hỏi cụ thể từ người dùng: "${message_text}"\n\nHƯỚNG DẪN TRẢ LỜI:\n1. Dựa PRIMARILY trên các tài liệu đã cung cấp ở trên để trả lời câu hỏi.\n2. Nếu tài liệu có thông tin liên quan, hãy trích dẫn và sử dụng thông tin đó.\n3. Nếu tài liệu không có thông tin cụ thể, hãy tổng hợp thông tin chung từ các tài liệu có liên quan.\n4. Trả lời bằng tiếng Việt, rõ ràng, có cấu trúc và không sử dụng markdown.\n5. Nếu thực sự không có thông tin liên quan trong bất kỳ tài liệu nào, mới thông báo là không tìm thấy thông tin cụ thể.`;
         } else {
           prompt = `${systemPrompt}\n\nCâu hỏi: ${message_text}\n\nHãy trả lời bằng tiếng Việt, ngắn gọn, dễ hiểu và không sử dụng markdown.`;
         }
