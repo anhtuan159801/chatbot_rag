@@ -237,16 +237,26 @@ async function processDocumentAsync(
     await updateDocumentStatus(documentId, "PROCESSING");
     console.log(`[PROCESSING] Status updated to PROCESSING for: ${name}`);
 
-    // Save file to storage
-    const storedFile = await storageService.saveFile(file, documentId);
-    console.log(`[PROCESSING] File saved to storage: ${storedFile.url}`);
+    // Save file to storage (graceful fallback if storage fails)
+    let storedFile: any = { url: null, path: null };
+    try {
+      storedFile = await storageService.saveFile(file, documentId);
+      console.log(`[PROCESSING] File saved to storage: ${storedFile.url}`);
+    } catch (storageError: any) {
+      console.warn(
+        `[PROCESSING] ⚠ Storage error: ${storageError.message}. Continuing without file storage.`,
+      );
+      storedFile = { url: null, path: null };
+    }
 
     // Update content_url in database
-    await pg.query("UPDATE knowledge_base SET content_url = $1 WHERE id = $2", [
-      storedFile.url,
-      documentId,
-    ]);
-    console.log(`[PROCESSING] Database updated with content_url`);
+    if (storedFile.url) {
+      await pg.query(
+        "UPDATE knowledge_base SET content_url = $1 WHERE id = $2",
+        [storedFile.url, documentId],
+      );
+      console.log(`[PROCESSING] Database updated with content_url`);
+    }
 
     // Get local file path for extraction
     const filePath = await storageService.getLocalFilePath(storedFile.path);
