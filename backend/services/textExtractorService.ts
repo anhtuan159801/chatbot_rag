@@ -1,9 +1,9 @@
-import fs from 'fs-extra';
-import path from 'path';
-import { PDFParse } from 'pdf-parse';
-import mammoth from 'mammoth';
-import * as cheerio from 'cheerio';
-import axios from 'axios';
+import fs from "fs-extra";
+import path from "path";
+import { PDFParse } from "pdf-parse";
+import mammoth from "mammoth";
+import * as cheerio from "cheerio";
+import axios from "axios";
 
 export interface ExtractedText {
   text: string;
@@ -16,29 +16,49 @@ export interface ExtractedText {
 }
 
 export class TextExtractorService {
-  
   async extractFromFile(filePath: string): Promise<ExtractedText> {
     const ext = path.extname(filePath).toLowerCase();
+    const buffer = await fs.readFile(filePath);
 
     switch (ext) {
-      case '.pdf':
-        return this.extractFromPDF(filePath);
-      case '.docx':
-      case '.doc':
-        return this.extractFromDOCX(filePath);
-      case '.csv':
-        return this.extractFromCSV(filePath);
-      case '.txt':
-        return this.extractFromTXT(filePath);
+      case ".pdf":
+        return this.extractFromPDFBuffer(buffer);
+      case ".docx":
+      case ".doc":
+        return this.extractFromDOCXBuffer(buffer);
+      case ".csv":
+        return this.extractFromCSVBuffer(buffer);
+      case ".txt":
+        return this.extractFromTXTBuffer(buffer);
       default:
         throw new Error(`Unsupported file type: ${ext}`);
     }
   }
 
-  async extractFromPDF(filePath: string): Promise<ExtractedText> {
+  async extractFromBuffer(
+    buffer: Buffer,
+    originalname: string,
+  ): Promise<ExtractedText> {
+    const ext = path.extname(originalname).toLowerCase();
+
+    switch (ext) {
+      case ".pdf":
+        return this.extractFromPDFBuffer(buffer);
+      case ".docx":
+      case ".doc":
+        return this.extractFromDOCXBuffer(buffer);
+      case ".csv":
+        return this.extractFromCSVBuffer(buffer);
+      case ".txt":
+        return this.extractFromTXTBuffer(buffer);
+      default:
+        throw new Error(`Unsupported file type: ${ext}`);
+    }
+  }
+
+  async extractFromPDFBuffer(buffer: Buffer): Promise<ExtractedText> {
     try {
-      const dataBuffer = await fs.readFile(filePath);
-      const pdf = new PDFParse({ data: dataBuffer });
+      const pdf = new PDFParse({ data: buffer });
       const textResult = await pdf.getText();
 
       return {
@@ -46,22 +66,23 @@ export class TextExtractorService {
         metadata: {
           totalPages: textResult.pages.length,
           characters: textResult.text.length,
-          words: this.countWords(textResult.text)
-        }
+          words: this.countWords(textResult.text),
+        },
       };
     } catch (error) {
-      console.error('Error extracting PDF:', error);
-      throw new Error(`Failed to extract text from PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("Error extracting PDF:", error);
+      throw new Error(
+        `Failed to extract text from PDF: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     }
   }
 
-  async extractFromDOCX(filePath: string): Promise<ExtractedText> {
+  async extractFromDOCXBuffer(buffer: Buffer): Promise<ExtractedText> {
     try {
-      const dataBuffer = await fs.readFile(filePath);
-      const result = await mammoth.extractRawText({ buffer: dataBuffer });
+      const result = await mammoth.extractRawText({ buffer });
 
       if (result.messages.length > 0) {
-        console.warn('DOCX extraction warnings:', result.messages);
+        console.warn("DOCX extraction warnings:", result.messages);
       }
 
       return {
@@ -69,24 +90,26 @@ export class TextExtractorService {
         metadata: {
           characters: result.value.length,
           words: this.countWords(result.value),
-          paragraphs: result.value.split(/\n\n+/).length
-        }
+          paragraphs: result.value.split(/\n\n+/).length,
+        },
       };
     } catch (error) {
-      console.error('Error extracting DOCX:', error);
-      throw new Error(`Failed to extract text from DOCX: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("Error extracting DOCX:", error);
+      throw new Error(
+        `Failed to extract text from DOCX: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     }
   }
 
-  async extractFromCSV(filePath: string): Promise<ExtractedText> {
+  async extractFromCSVBuffer(buffer: Buffer): Promise<ExtractedText> {
     try {
-      const content = await fs.readFile(filePath, 'utf-8');
-      const lines = content.split('\n').filter(line => line.trim());
-      
-      let text = '';
+      const content = buffer.toString("utf-8");
+      const lines = content.split("\n").filter((line) => line.trim());
+
+      let text = "";
       lines.forEach((line, index) => {
-        const values = line.split(',');
-        text += `Row ${index + 1}: ${values.join(' | ')}\n`;
+        const values = line.split(",");
+        text += `Row ${index + 1}: ${values.join(" | ")}\n`;
       });
 
       return {
@@ -94,30 +117,34 @@ export class TextExtractorService {
         metadata: {
           characters: text.length,
           words: this.countWords(text),
-          paragraphs: lines.length
-        }
+          paragraphs: lines.length,
+        },
       };
     } catch (error) {
-      console.error('Error extracting CSV:', error);
-      throw new Error(`Failed to extract text from CSV: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("Error extracting CSV:", error);
+      throw new Error(
+        `Failed to extract text from CSV: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     }
   }
 
-  async extractFromTXT(filePath: string): Promise<ExtractedText> {
+  async extractFromTXTBuffer(buffer: Buffer): Promise<ExtractedText> {
     try {
-      const text = await fs.readFile(filePath, 'utf-8');
+      const text = buffer.toString("utf-8");
 
       return {
         text: text,
         metadata: {
           characters: text.length,
           words: this.countWords(text),
-          paragraphs: text.split(/\n\n+/).length
-        }
+          paragraphs: text.split(/\n\n+/).length,
+        },
       };
     } catch (error) {
-      console.error('Error extracting TXT:', error);
-      throw new Error(`Failed to extract text from TXT: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("Error extracting TXT:", error);
+      throw new Error(
+        `Failed to extract text from TXT: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     }
   }
 
@@ -125,19 +152,20 @@ export class TextExtractorService {
     try {
       const response = await axios.get(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         },
-        timeout: 10000
+        timeout: 10000,
       });
 
       const $ = cheerio.load(response.data);
-      
-      $('script, style, nav, footer, aside, iframe, noscript').remove();
 
-      const title = $('title').text().trim();
-      const bodyText = $('body').text().replace(/\s+/g, ' ').trim();
+      $("script, style, nav, footer, aside, iframe, noscript").remove();
 
-      let fullText = title ? `Tiêu đề: ${title}\n\n` : '';
+      const title = $("title").text().trim();
+      const bodyText = $("body").text().replace(/\s+/g, " ").trim();
+
+      let fullText = title ? `Tiêu đề: ${title}\n\n` : "";
       fullText += `Nguồn: ${url}\n\n`;
       fullText += bodyText;
 
@@ -146,17 +174,22 @@ export class TextExtractorService {
         metadata: {
           characters: fullText.length,
           words: this.countWords(fullText),
-          paragraphs: bodyText.split(/[.!?]+/).length
-        }
+          paragraphs: bodyText.split(/[.!?]+/).length,
+        },
       };
     } catch (error) {
-      console.error('Error extracting from web:', error);
-      throw new Error(`Failed to extract text from web: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("Error extracting from web:", error);
+      throw new Error(
+        `Failed to extract text from web: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     }
   }
 
   private countWords(text: string): number {
-    return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+    return text
+      .trim()
+      .split(/\s+/)
+      .filter((word) => word.length > 0).length;
   }
 }
 

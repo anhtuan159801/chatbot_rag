@@ -289,12 +289,6 @@ async function processDocumentAsync(
       filePath = null;
     }
 
-    if (!filePath) {
-      console.warn(
-        `[PROCESSING] ⚠ No file path available, trying direct buffer extraction`,
-      );
-    }
-
     let extractedText: any = {
       text: "",
       metadata: { words: 0, totalPages: 1 },
@@ -302,12 +296,21 @@ async function processDocumentAsync(
     try {
       if (filePath) {
         extractedText = await textExtractorService.extractFromFile(filePath);
+        console.log(
+          `[PROCESSING] Extracted ${extractedText.metadata.words} words from file path`,
+        );
       } else {
-        throw new Error("No file path available for extraction");
+        console.warn(
+          `[PROCESSING] ⚠ No file path, extracting directly from buffer`,
+        );
+        extractedText = await textExtractorService.extractFromBuffer(
+          file.buffer,
+          file.originalname,
+        );
+        console.log(
+          `[PROCESSING] Extracted ${extractedText.metadata.words} words from buffer`,
+        );
       }
-      console.log(
-        `[PROCESSING] Extracted ${extractedText.metadata.words} words from document`,
-      );
     } catch (extractError: any) {
       console.warn(
         `[PROCESSING] ⚠ Text extraction failed: ${extractError.message}`,

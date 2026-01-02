@@ -141,6 +141,7 @@ export class StorageService {
     filename: string,
   ): Promise<StoredFile> {
     try {
+      await this.ensureUploadsDirectory();
       const filePath = path.join(this.uploadsDir, filename);
       await fs.writeFile(filePath, file.buffer);
 
