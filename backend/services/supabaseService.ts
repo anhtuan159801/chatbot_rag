@@ -253,6 +253,80 @@ export const updateAiRoles = async (
     console.error("Error updating AI roles:", error.message);
     return false;
   }
+}
+
+// RAG Configuration functions
+export interface RagConfig {
+  vectorWeight: number;
+  keywordWeight: number;
+  defaultTopK: number;
+  minSimilarity: number;
+  embeddingProvider: string;
+  embeddingModel: string;
+}
+
+export const getRagConfig = async (): Promise<RagConfig> => {
+  try {
+    const client = await getClient();
+    if (!client) return {
+      vectorWeight: 0.7,
+      keywordWeight: 0.3,
+      defaultTopK: 3,
+      minSimilarity: 0.3,
+      embeddingProvider: 'huggingface',
+      embeddingModel: 'BAAI/bge-small-en-v1.5'
+    };
+
+    // Get RAG-specific settings from system_configs
+    const vectorWeight = await getConfig('rag_vector_weight');
+    const keywordWeight = await getConfig('rag_keyword_weight');
+    const defaultTopK = await getConfig('rag_default_top_k');
+    const minSimilarity = await getConfig('rag_min_similarity');
+    const embeddingProvider = await getConfig('embedding_provider');
+    const embeddingModel = await getConfig('embedding_model');
+
+    return {
+      vectorWeight: vectorWeight !== null ? parseFloat(vectorWeight) : 0.7,
+      keywordWeight: keywordWeight !== null ? parseFloat(keywordWeight) : 0.3,
+      defaultTopK: defaultTopK !== null ? parseInt(defaultTopK) : 3,
+      minSimilarity: minSimilarity !== null ? parseFloat(minSimilarity) : 0.3,
+      embeddingProvider: embeddingProvider !== null ? embeddingProvider : 'huggingface',
+      embeddingModel: embeddingModel !== null ? embeddingModel : 'BAAI/bge-small-en-v1.5'
+    };
+  } catch (error: any) {
+    console.error("Error getting RAG config:", error.message);
+    return {
+      vectorWeight: 0.7,
+      keywordWeight: 0.3,
+      defaultTopK: 3,
+      minSimilarity: 0.3,
+      embeddingProvider: 'huggingface',
+      embeddingModel: 'BAAI/bge-small-en-v1.5'
+    };
+  }
+};
+
+export const updateRagConfig = async (config: RagConfig): Promise<boolean> => {
+  try {
+    const client = await getClient();
+    if (!client) return false;
+
+    // Update each RAG setting individually
+    const updates = [
+      updateConfig('rag_vector_weight', config.vectorWeight.toString()),
+      updateConfig('rag_keyword_weight', config.keywordWeight.toString()),
+      updateConfig('rag_default_top_k', config.defaultTopK.toString()),
+      updateConfig('rag_min_similarity', config.minSimilarity.toString()),
+      updateConfig('embedding_provider', config.embeddingProvider),
+      updateConfig('embedding_model', config.embeddingModel)
+    ];
+
+    const results = await Promise.all(updates);
+    return results.every(result => result);
+  } catch (error: any) {
+    console.error("Error updating RAG config:", error.message);
+    return false;
+  }
 };
 
 export const initializeSystemData = async (): Promise<void> => {

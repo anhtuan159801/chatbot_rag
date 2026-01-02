@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useToast } from './Toast';
 
-type TabType = 'integrations' | 'models' | 'roles' | 'test';
+type TabType = 'integrations' | 'models' | 'roles' | 'rag' | 'test';
 
 interface ModelConfig {
     id: string;
@@ -93,6 +93,43 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
   });
   const [hasUnsavedRoles, setHasUnsavedRoles] = useState(false);
   const [savingRoles, setSavingRoles] = useState(false);
+
+  // --- RAG Configuration State ---
+  const [ragConfig, setRagConfig] = useState({
+    vectorWeight: 0.7,
+    keywordWeight: 0.3,
+    defaultTopK: 3,
+    minSimilarity: 0.3,
+    embeddingProvider: 'huggingface',
+    embeddingModel: 'BAAI/bge-small-en-v1.5'
+  });
+  const [hasUnsavedRag, setHasUnsavedRag] = useState(false);
+  const [savingRag, setSavingRag] = useState(false);
+  const [loadingRag, setLoadingRag] = useState(false);
+
+  // Load initial RAG config from the server when component mounts
+  useEffect(() => {
+    const loadRagConfig = async () => {
+      try {
+        setLoadingRag(true);
+        const response = await fetch('/api/rag-config');
+        if (response.ok) {
+          const serverConfig = await response.json();
+          console.log('Loaded RAG config from server:', serverConfig);
+          setRagConfig(serverConfig);
+          setHasUnsavedRag(false);
+        } else {
+          console.error('Failed to load RAG config');
+        }
+      } catch (error) {
+        console.error('Error loading RAG config:', error);
+      } finally {
+        setLoadingRag(false);
+      }
+    };
+
+    loadRagConfig();
+  }, []);
 
   // Load initial roles from the server when component mounts
   useEffect(() => {
@@ -829,6 +866,193 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
     </div>
   );
 
+  const renderRagConfig = () => (
+    <div className="space-y-6">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100">
+          <h3 className="text-lg font-bold text-slate-900">Cấu hình RAG (Retrieval-Augmented Generation)</h3>
+          <p className="text-slate-500 text-sm">Tùy chỉnh các tham số tìm kiếm và nhúng dữ liệu.</p>
+        </div>
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <Database size={16} /> Trọng số Vector
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="1"
+              step="0.01"
+              value={ragConfig.vectorWeight}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value) && value >= 0 && value <= 1) {
+                  setRagConfig(prev => ({ ...prev, vectorWeight: value }));
+                  setHasUnsavedRag(true);
+                }
+              }}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+            />
+            <p className="text-xs text-slate-400">Trọng số cho kết quả tìm kiếm vector (0-1)</p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <Database size={16} /> Trọng số Từ khóa
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="1"
+              step="0.01"
+              value={ragConfig.keywordWeight}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value) && value >= 0 && value <= 1) {
+                  setRagConfig(prev => ({ ...prev, keywordWeight: value }));
+                  setHasUnsavedRag(true);
+                }
+              }}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+            />
+            <p className="text-xs text-slate-400">Trọng số cho kết quả tìm kiếm từ khóa (0-1)</p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <Layers size={16} /> Số lượng kết quả Top-K
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={ragConfig.defaultTopK}
+              onChange={(e) => {
+                const value = parseInt(e.target.value);
+                if (!isNaN(value) && value >= 1) {
+                  setRagConfig(prev => ({ ...prev, defaultTopK: value }));
+                  setHasUnsavedRag(true);
+                }
+              }}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+            />
+            <p className="text-xs text-slate-400">Số lượng kết quả tối đa trả về</p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <Activity size={16} /> Ngưỡng Tương đồng Tối thiểu
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="1"
+              step="0.01"
+              value={ragConfig.minSimilarity}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value) && value >= 0 && value <= 1) {
+                  setRagConfig(prev => ({ ...prev, minSimilarity: value }));
+                  setHasUnsavedRag(true);
+                }
+              }}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+            />
+            <p className="text-xs text-slate-400">Ngưỡng tương đồng tối thiểu để trả về kết quả (0-1)</p>
+          </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <Cpu size={16} /> Nhà cung cấp Nhúng
+            </label>
+            <select
+              value={ragConfig.embeddingProvider}
+              onChange={(e) => {
+                setRagConfig(prev => ({ ...prev, embeddingProvider: e.target.value }));
+                setHasUnsavedRag(true);
+              }}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-slate-800 appearance-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+            >
+              <option value="huggingface">Hugging Face</option>
+              <option value="openai">OpenAI</option>
+              <option value="gemini">Google Gemini</option>
+            </select>
+            <p className="text-xs text-slate-400">Nhà cung cấp dịch vụ nhúng dữ liệu</p>
+          </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <Cpu size={16} /> Mô hình Nhúng
+            </label>
+            <input
+              type="text"
+              value={ragConfig.embeddingModel}
+              onChange={(e) => {
+                setRagConfig(prev => ({ ...prev, embeddingModel: e.target.value }));
+                setHasUnsavedRag(true);
+              }}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+              placeholder="VD: BAAI/bge-small-en-v1.5"
+            />
+            <p className="text-xs text-slate-400">Tên mô hình nhúng dữ liệu (từ HuggingFace hoặc nhà cung cấp khác)</p>
+          </div>
+        </div>
+        <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            {hasUnsavedRag && (
+              <div className="text-xs text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200 flex items-center gap-2">
+                <Zap size={14} className="text-amber-500" />
+                Có thay đổi chưa lưu
+              </div>
+            )}
+          </div>
+          <button
+            onClick={async () => {
+              if (!hasUnsavedRag) {
+                showToast('Không có thay đổi để lưu', 'info');
+                return;
+              }
+
+              setSavingRag(true);
+              try {
+                const response = await fetch('/api/rag-config', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(ragConfig)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                  showToast('Đã lưu cấu hình RAG thành công!', 'success');
+                  setLastSaved(new Date());
+                  setHasUnsavedRag(false);
+                } else {
+                  showToast(`Lưu thất bại: ${result.error || 'Lỗi không xác định'}`, 'error');
+                }
+              } catch (error) {
+                console.error('Error saving RAG config:', error);
+                showToast('Lỗi kết nối máy chủ khi lưu cấu hình RAG.', 'error');
+              } finally {
+                setSavingRag(false);
+              }
+            }}
+            disabled={savingRag || !hasUnsavedRag}
+            className={`px-6 py-2.5 rounded-lg font-semibold transition-all shadow-lg flex items-center justify-center gap-2 ${
+              hasUnsavedRag && !savingRag
+              ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20'
+              : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+            }`}
+          >
+            {savingRag ? <RefreshCw size={18} className="animate-spin" /> : <Save size={18} />}
+            Lưu Cấu hình RAG
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -851,14 +1075,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
             { id: 'integrations', label: 'Kết nối', icon: <Link size={18} /> },
             { id: 'models', label: 'Mô hình AI', icon: <Cpu size={18} /> },
             { id: 'roles', label: 'Phân vai & Prompt', icon: <Layers size={18} /> },
+            { id: 'rag', label: 'Cấu hình RAG', icon: <Database size={18} /> },
             { id: 'test', label: 'Kiểm thử Chat', icon: <Play size={18} /> },
         ].map(tab => (
             <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as TabType)}
                 className={`px-5 py-3 text-sm font-semibold flex items-center gap-2.5 rounded-t-lg transition-all relative top-[1px] whitespace-nowrap ${
-                    activeTab === tab.id 
-                    ? 'text-blue-600 bg-white border border-slate-200 border-b-white shadow-sm' 
+                    activeTab === tab.id
+                    ? 'text-blue-600 bg-white border border-slate-200 border-b-white shadow-sm'
                     : 'text-slate-500 hover:text-slate-700 hover:bg-white/50 border border-transparent'
                 }`}
             >
@@ -871,6 +1096,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ fbConfig, setFbConfig }) =>
         {activeTab === 'integrations' && renderIntegrations()}
         {activeTab === 'models' && renderModels()}
         {activeTab === 'roles' && renderRoles()}
+        {activeTab === 'rag' && renderRagConfig()}
         {activeTab === 'test' && (
             <div className="bg-white rounded-2xl border border-slate-200 h-[600px] flex flex-col overflow-hidden shadow-sm">
                 <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">

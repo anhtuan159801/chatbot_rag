@@ -25,14 +25,29 @@ export interface KnowledgeChunk {
 }
 
 export class RAGService {
-  private readonly VECTOR_WEIGHT = 0.7;
-  private readonly KEYWORD_WEIGHT = 0.3;
-  private readonly MIN_SIMILARITY = parseFloat(process.env.MIN_SIMILARITY || '0.3'); // Lower threshold for better recall
   private readonly CACHE_TTL = 300_000; // 5 minutes
   private hfClient: InferenceClient;
+  private vectorWeight: number = 0.7;
+  private keywordWeight: number = 0.3;
+  private minSimilarity: number = 0.3;
 
   constructor(hfClient: InferenceClient) {
     this.hfClient = hfClient;
+    // Initialize with default values, will be updated when needed
+    this.loadConfig();
+  }
+
+  private async loadConfig() {
+    try {
+      const { getRagConfig } = await import('./supabaseService.js');
+      const config = await getRagConfig();
+      this.vectorWeight = config.vectorWeight;
+      this.keywordWeight = config.keywordWeight;
+      this.minSimilarity = config.minSimilarity;
+    } catch (error) {
+      console.error("[RAG] Error loading configuration, using defaults:", error);
+      // Keep default values if config loading fails
+    }
   }
 
   /**
@@ -47,6 +62,9 @@ export class RAGService {
       console.warn("[RAG] ⚠️ Empty query received.");
       return [];
     }
+
+    // Reload configuration to ensure we have the latest values
+    await this.loadConfig();
 
     const cacheKey = ragCache.getCacheKey("rag", { query, topK });
     const cached = ragCache.get<KnowledgeChunk[]>(cacheKey);
@@ -144,11 +162,11 @@ export class RAGService {
       seen.add(item.id);
 
       const score =
-        (item.source === "vector" ? this.VECTOR_WEIGHT : 0) * item.similarity +
-        (item.source === "keyword" ? this.KEYWORD_WEIGHT : 0) * item.similarity;
+        (item.source === "vector" ? this.vectorWeight : 0) * item.similarity +
+        (item.source === "keyword" ? this.keywordWeight : 0) * item.similarity;
 
       // Only add items that meet the minimum similarity threshold
-      if (score >= this.MIN_SIMILARITY) {
+      if (score >= this.minSimilarity) {
         merged.push({
           ...item,
           similarity: score,

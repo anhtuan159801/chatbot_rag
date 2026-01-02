@@ -304,6 +304,59 @@ app.post("/api/roles", async (req, res) => {
   }
 });
 
+// Endpoint to get RAG configuration
+app.get("/api/rag-config", async (req, res) => {
+  try {
+    const ragConfig = await import("./services/supabaseService.js");
+    const config = await ragConfig.getRagConfig();
+    res.json(config);
+  } catch (error) {
+    console.error("Error getting RAG config:", error);
+    res.status(500).json({ error: "Failed to retrieve RAG configuration" });
+  }
+});
+
+// Endpoint to update RAG configuration
+app.post("/api/rag-config", async (req, res) => {
+  try {
+    const ragConfig = await import("./services/supabaseService.js");
+    const config = req.body;
+
+    // Validate the configuration
+    if (typeof config.vectorWeight !== 'number' || config.vectorWeight < 0 || config.vectorWeight > 1) {
+      return res.status(400).json({ error: "vectorWeight must be a number between 0 and 1" });
+    }
+    if (typeof config.keywordWeight !== 'number' || config.keywordWeight < 0 || config.keywordWeight > 1) {
+      return res.status(400).json({ error: "keywordWeight must be a number between 0 and 1" });
+    }
+    if (typeof config.defaultTopK !== 'number' || config.defaultTopK < 1) {
+      return res.status(400).json({ error: "defaultTopK must be a positive number" });
+    }
+    if (typeof config.minSimilarity !== 'number' || config.minSimilarity < 0 || config.minSimilarity > 1) {
+      return res.status(400).json({ error: "minSimilarity must be a number between 0 and 1" });
+    }
+    if (typeof config.embeddingProvider !== 'string' || !config.embeddingProvider) {
+      return res.status(400).json({ error: "embeddingProvider must be a non-empty string" });
+    }
+    if (typeof config.embeddingModel !== 'string' || !config.embeddingModel) {
+      return res.status(400).json({ error: "embeddingModel must be a non-empty string" });
+    }
+
+    const success = await ragConfig.updateRagConfig(config);
+    if (success) {
+      res.json({
+        success: true,
+        message: "RAG configuration updated successfully",
+      });
+    } else {
+      res.status(500).json({ error: "Failed to update RAG configuration" });
+    }
+  } catch (error) {
+    console.error("Error updating RAG config:", error);
+    res.status(500).json({ error: "Failed to update RAG configuration" });
+  }
+});
+
 // Facebook Webhook Verification Endpoint
 app.get("/webhooks/facebook", (req, res) => {
   const VERIFY_TOKEN =
@@ -489,9 +542,14 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
 
         // RAG: Search knowledge base for relevant chunks
         console.log("[WEBHOOK] Step 5: 🔍 Searching knowledge base...");
+        // Get the default topK from config
+        const { getRagConfig } = await import("./services/supabaseService.js");
+        const ragConfig = await getRagConfig();
+        const topK = ragConfig.defaultTopK || 3;
+
         const relevantChunks = await ragServiceInstance.searchKnowledge(
           message_text,
-          3,
+          topK,
         );
         let ragContext = "";
 
