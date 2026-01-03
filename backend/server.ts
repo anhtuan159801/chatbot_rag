@@ -37,10 +37,6 @@ const hfApiKey =
   process.env.HF_API_KEY || process.env.HUGGINGFACE_API_KEY || "";
 const hfClient = new InferenceClient(hfApiKey);
 
-// Middleware
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
-
 // Add comprehensive security headers
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -66,6 +62,105 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+// Facebook Webhook Verification Endpoint (before global JSON parsing)
+app.get("/webhooks/facebook", (req, res) => {
+  const VERIFY_TOKEN =
+    process.env.FB_VERIFY_TOKEN || "dvc_verify_token_2024_secure";
+
+  const mode = req.query["hub.mode"];
+  const token = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
+
+  if (mode && token) {
+    if (mode === "subscribe" && token === VERIFY_TOKEN) {
+      console.log("Webhook verified successfully");
+      res.status(200).send(challenge);
+    } else {
+      console.log("Webhook verification failed:", {
+        mode,
+        token,
+        expected: VERIFY_TOKEN,
+      });
+      res.status(403).send("Forbidden");
+    }
+  } else {
+    console.log("Missing query parameters for webhook verification");
+    res.status(400).send("Bad Request");
+  }
+});
+
+// Facebook Webhook Message Handler (before global JSON parsing to preserve raw body)
+app.post(
+  "/webhooks/facebook",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    const VERIFY_TOKEN =
+      process.env.FB_VERIFY_TOKEN || "dvc_verify_token_2024_secure";
+    const signature = req.get("X-Hub-Signature-256");
+
+    console.log("Received webhook request:", {
+      signature,
+      body: Buffer.isBuffer(req.body)
+        ? req.body.toString()
+        : typeof req.body === "string"
+          ? req.body
+          : JSON.stringify(req.body),
+    });
+
+    // Verify webhook signature for security
+    if (signature) {
+      const isValid = verifyFacebookWebhook({
+        payload: req.body,
+        signature,
+        secret: VERIFY_TOKEN,
+      });
+
+      if (!isValid) {
+        console.error("[Webhook] Invalid signature, rejecting request");
+        return res.status(403).send("Forbidden: Invalid signature");
+      }
+    }
+
+    // Parse the request body from raw buffer to JSON
+    let body;
+    try {
+      // The body should be a buffer at this point, so parse it
+      body = JSON.parse(req.body.toString());
+    } catch (e) {
+      console.error("Error parsing webhook body:", e);
+      return res.status(400).send("Bad Request: Invalid JSON");
+    }
+
+    // Check if this is an event from a page subscription
+    if (body.object === "page") {
+      body.entry.forEach((entry: any) => {
+        const webhook_event = entry.messaging[0];
+        console.log("Webhook received event:", webhook_event);
+
+        const sender_psid = webhook_event.sender.id;
+        console.log("Sender PSID:", sender_psid);
+
+        if (webhook_event.message && webhook_event.message.text) {
+          const message_text = webhook_event.message.text;
+          console.log("Received message text:", message_text);
+
+          processMessageAsync(sender_psid, message_text).catch((err) => {
+            console.error("Unhandled error in message processing:", err);
+          });
+        }
+      });
+
+      res.status(200).send("EVENT_RECEIVED");
+    } else {
+      res.status(404).send("Not Found");
+    }
+  },
+);
+
+// Middleware for all other routes (after webhook routes to avoid interfering with webhook body parsing)
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
 
 // Use the API proxy routes
 app.use("/api", apiProxy);
@@ -411,81 +506,6 @@ app.get("/webhooks/facebook", (req, res) => {
     res.status(400).send("Bad Request");
   }
 });
-
-// Facebook Webhook Message Handler
-app.post(
-  "/webhooks/facebook",
-  express.raw({ type: "application/json" }),
-  async (req, res) => {
-    const VERIFY_TOKEN =
-      process.env.FB_VERIFY_TOKEN || "dvc_verify_token_2024_secure";
-    const signature = req.get("X-Hub-Signature-256");
-
-    console.log("Received webhook request:", {
-      signature,
-      body:
-        typeof req.body === "string"
-          ? req.body
-          : req.body?.toString
-            ? req.body.toString()
-            : "[Buffer Object]",
-    });
-
-    // Verify webhook signature for security
-    if (signature) {
-      const isValid = verifyFacebookWebhook({
-        payload: req.body,
-        signature,
-        secret: VERIFY_TOKEN,
-      });
-
-      if (!isValid) {
-        console.error("[Webhook] Invalid signature, rejecting request");
-        return res.status(403).send("Forbidden: Invalid signature");
-      }
-    }
-
-    // Parse the request body from raw buffer to JSON
-    let body;
-    try {
-      // Check if body is already an object or a buffer/string
-      if (typeof req.body === "object" && !Buffer.isBuffer(req.body)) {
-        // Body is already parsed as an object
-        body = req.body;
-      } else {
-        // Body is a buffer or string, need to parse
-        body = JSON.parse(req.body.toString());
-      }
-    } catch (e) {
-      console.error("Error parsing webhook body:", e);
-      return res.status(400).send("Bad Request: Invalid JSON");
-    }
-
-    // Check if this is an event from a page subscription
-    if (body.object === "page") {
-      body.entry.forEach((entry: any) => {
-        const webhook_event = entry.messaging[0];
-        console.log("Webhook received event:", webhook_event);
-
-        const sender_psid = webhook_event.sender.id;
-        console.log("Sender PSID:", sender_psid);
-
-        if (webhook_event.message && webhook_event.message.text) {
-          const message_text = webhook_event.message.text;
-          console.log("Received message text:", message_text);
-
-          processMessageAsync(sender_psid, message_text).catch((err) => {
-            console.error("Unhandled error in message processing:", err);
-          });
-        }
-      });
-
-      res.status(200).send("EVENT_RECEIVED");
-    } else {
-      res.status(404).send("Not Found");
-    }
-  },
-);
 
 async function processMessageAsync(sender_psid: string, message_text: string) {
   console.log(`\n[WEBHOOK] ====================`);
