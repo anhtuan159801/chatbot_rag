@@ -99,10 +99,10 @@ export class DatabaseClient {
     }, this.reconnectDelayMs);
   }
 
-  async query<T = any>(
+  async query(
     text: string,
     params?: any[],
-  ): Promise<{ rows: T[]; rowCount: number }> {
+  ): Promise<{ rows: any[]; rowCount: number }> {
     if (!this.client || !this.isConnected) {
       try {
         await this.connect();
@@ -116,7 +116,7 @@ export class DatabaseClient {
     }
 
     try {
-      const result = await this.client.query<T>(text, params);
+      const result = await this.client.query(text, params);
       return {
         rows: result.rows,
         rowCount: result.rowCount || 0,
