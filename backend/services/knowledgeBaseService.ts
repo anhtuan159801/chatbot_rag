@@ -1,12 +1,14 @@
 import express from "express";
 import multer from "multer";
-import { InferenceClient } from "@huggingface/inference";
 import crypto from "crypto";
 import { getClient } from "./supabaseService.js";
 import { getAiRoles, getModels } from "./supabaseService.js";
 import { storageService } from "./storageService.js";
 import { textExtractorService } from "./textExtractorService.js";
 import { chunkingService } from "./chunkingService.js";
+import { embeddingService } from "./embeddingService.js";
+import { deadLetterQueue } from "./deadLetterQueue.js";
+import { sanitizeDocumentName, sanitizeURL } from "./inputSanitizer.js";
 
 const router = express.Router();
 
@@ -107,6 +109,17 @@ router.post(
 
       processDocumentAsync(documentId, documentName, req.file).catch((err) => {
         console.error("ERROR processing document:", err);
+        deadLetterQueue
+          .add(
+            "document",
+            documentId,
+            { name: documentName, file: req.file },
+            err as Error,
+            "document_processing",
+          )
+          .catch((dlqError) =>
+            console.error("Failed to add to DLQ:", dlqError),
+          );
         updateDocumentStatus(documentId, "FAILED");
       });
 
@@ -153,6 +166,9 @@ router.post("/knowledge-base/crawl", async (req, res) => {
 
     processWebPageAsync(documentId, url).catch((err) => {
       console.error("Error processing webpage:", err);
+      deadLetterQueue
+        .add("webpage", documentId, { url }, err as Error, "webpage_processing")
+        .catch((dlqError) => console.error("Failed to add to DLQ:", dlqError));
       updateDocumentStatus(documentId, "FAILED");
     });
 
@@ -376,7 +392,7 @@ async function processDocumentAsync(
 
         if (embedding && pg && hasVectorSupport) {
           try {
-            const embeddingStr = embedding.join(',');
+            const embeddingStr = embedding.join(",");
             await pg.query(
               `INSERT INTO knowledge_chunks (knowledge_base_id, content, embedding, chunk_index, metadata)
                VALUES ($1, $2, string_to_array($3, ',')::float4[]::vector, $4, $5)`,
@@ -401,7 +417,7 @@ async function processDocumentAsync(
             } else if (
               vectorError.code === "22P02" ||
               vectorError.message?.includes(
-                "invalid input syntax for type vector"
+                "invalid input syntax for type vector",
               )
             ) {
               console.warn(
@@ -541,7 +557,7 @@ async function processWebPageAsync(documentId: string, url: string) {
 
         if (embedding && pg && hasVectorSupport) {
           try {
-            const embeddingStr = embedding.join(',');
+            const embeddingStr = embedding.join(",");
             await pg.query(
               `INSERT INTO knowledge_chunks (knowledge_base_id, content, embedding, chunk_index, metadata)
                VALUES ($1, $2, string_to_array($3, ',')::float4[]::vector, $4, $5)`,
@@ -566,7 +582,7 @@ async function processWebPageAsync(documentId: string, url: string) {
             } else if (
               vectorError.code === "22P02" ||
               vectorError.message?.includes(
-                "invalid input syntax for type vector"
+                "invalid input syntax for type vector",
               )
             ) {
               console.warn(
@@ -663,55 +679,21 @@ async function generateEmbedding(
   embeddingModel?: any,
 ): Promise<number[] | null> {
   try {
-    let apiKey = "";
-    let modelName = "BAAI/bge-small-en-v1.5";
-
-    if (embeddingModel && embeddingModel.api_key) {
-      apiKey = embeddingModel.api_key;
-    } else {
-      apiKey = process.env.HUGGINGFACE_API_KEY || "";
-    }
-
-    if (!apiKey) {
-      console.error(
-        "[EMBEDDING] ERROR: No HUGGINGFACE_API_KEY found in environment variables",
-      );
-      return null;
-    }
-
     if (embeddingModel && embeddingModel.model_string) {
-      modelName = embeddingModel.model_string;
+      embeddingService.setModelConfig(embeddingModel);
     }
 
-    console.log(`[EMBEDDING] Using model: ${modelName}`);
-
-    const client = new InferenceClient(apiKey);
-    const result = await client.featureExtraction({
-      model: modelName,
-      inputs: text,
-    });
-
-    let embedding: number[] | null = null;
-
-    if (typeof result === "number") {
-      embedding = [result];
-    } else if (Array.isArray(result) && result.length > 0) {
-      if (typeof result[0] === "number") {
-        embedding = result as number[];
-      } else if (Array.isArray(result[0])) {
-        embedding = result[0] as number[];
-      }
-    }
+    const embedding = await embeddingService.generateEmbedding(text);
 
     if (!embedding) {
-      console.error("[EMBEDDING] ✗ Invalid response format - expected array");
+      console.error("[EMBEDDING] ✗ Failed to generate embedding");
       return null;
     }
 
     console.log(
       `[EMBEDDING] ✓ Success - embedding dimension: ${embedding.length}`,
     );
-    return embedding.map((v) => Number(v));
+    return embedding;
   } catch (error: any) {
     console.error("[EMBEDDING] ✗ Exception:", error.message);
     return null;

@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import "dotenv/config";
 import apiProxy from "./services/apiProxy.js";
 import knowledgeBaseService from "./services/knowledgeBaseService.js";
+import { verifyFacebookWebhook } from "./services/webhookVerifier.js";
 import {
   getConfig,
   updateConfig,
@@ -323,23 +324,50 @@ app.post("/api/rag-config", async (req, res) => {
     const config = req.body;
 
     // Validate the configuration
-    if (typeof config.vectorWeight !== 'number' || config.vectorWeight < 0 || config.vectorWeight > 1) {
-      return res.status(400).json({ error: "vectorWeight must be a number between 0 and 1" });
+    if (
+      typeof config.vectorWeight !== "number" ||
+      config.vectorWeight < 0 ||
+      config.vectorWeight > 1
+    ) {
+      return res
+        .status(400)
+        .json({ error: "vectorWeight must be a number between 0 and 1" });
     }
-    if (typeof config.keywordWeight !== 'number' || config.keywordWeight < 0 || config.keywordWeight > 1) {
-      return res.status(400).json({ error: "keywordWeight must be a number between 0 and 1" });
+    if (
+      typeof config.keywordWeight !== "number" ||
+      config.keywordWeight < 0 ||
+      config.keywordWeight > 1
+    ) {
+      return res
+        .status(400)
+        .json({ error: "keywordWeight must be a number between 0 and 1" });
     }
-    if (typeof config.defaultTopK !== 'number' || config.defaultTopK < 1) {
-      return res.status(400).json({ error: "defaultTopK must be a positive number" });
+    if (typeof config.defaultTopK !== "number" || config.defaultTopK < 1) {
+      return res
+        .status(400)
+        .json({ error: "defaultTopK must be a positive number" });
     }
-    if (typeof config.minSimilarity !== 'number' || config.minSimilarity < 0 || config.minSimilarity > 1) {
-      return res.status(400).json({ error: "minSimilarity must be a number between 0 and 1" });
+    if (
+      typeof config.minSimilarity !== "number" ||
+      config.minSimilarity < 0 ||
+      config.minSimilarity > 1
+    ) {
+      return res
+        .status(400)
+        .json({ error: "minSimilarity must be a number between 0 and 1" });
     }
-    if (typeof config.embeddingProvider !== 'string' || !config.embeddingProvider) {
-      return res.status(400).json({ error: "embeddingProvider must be a non-empty string" });
+    if (
+      typeof config.embeddingProvider !== "string" ||
+      !config.embeddingProvider
+    ) {
+      return res
+        .status(400)
+        .json({ error: "embeddingProvider must be a non-empty string" });
     }
-    if (typeof config.embeddingModel !== 'string' || !config.embeddingModel) {
-      return res.status(400).json({ error: "embeddingModel must be a non-empty string" });
+    if (typeof config.embeddingModel !== "string" || !config.embeddingModel) {
+      return res
+        .status(400)
+        .json({ error: "embeddingModel must be a non-empty string" });
     }
 
     const success = await ragConfig.updateRagConfig(config);
@@ -402,6 +430,20 @@ app.post(
             ? req.body.toString()
             : "[Buffer Object]",
     });
+
+    // Verify webhook signature for security
+    if (signature) {
+      const isValid = verifyFacebookWebhook({
+        payload: req.body,
+        signature,
+        secret: VERIFY_TOKEN,
+      });
+
+      if (!isValid) {
+        console.error("[Webhook] Invalid signature, rejecting request");
+        return res.status(403).send("Forbidden: Invalid signature");
+      }
+    }
 
     // Parse the request body from raw buffer to JSON
     let body;

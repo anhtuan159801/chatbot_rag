@@ -83,6 +83,7 @@ export interface KnowledgeChunkResult {
   content: string;
   metadata: any;
   similarity: number;
+  knowledge_base_id?: string;
 }
 
 async function getDbClient(): Promise<Client | null> {
@@ -164,14 +165,16 @@ export const getModels = async (): Promise<any[]> => {
   try {
     const client = await getClient();
     if (!client) return [];
+    // SECURITY: Removed api_key from SELECT to prevent API key exposure
     const result = await client.query(
-      "SELECT id, provider, name, model_string, api_key, is_active FROM ai_models ORDER BY name ASC",
+      "SELECT id, provider, name, model_string, is_active FROM ai_models ORDER BY name ASC",
     );
     return result.rows;
   } catch (error: any) {
     console.error("Error getting AI models:", error.message);
     return [];
   }
+}
 };
 
 export const updateModels = async (
@@ -253,7 +256,7 @@ export const updateAiRoles = async (
     console.error("Error updating AI roles:", error.message);
     return false;
   }
-}
+};
 
 // RAG Configuration functions
 export interface RagConfig {
@@ -268,30 +271,33 @@ export interface RagConfig {
 export const getRagConfig = async (): Promise<RagConfig> => {
   try {
     const client = await getClient();
-    if (!client) return {
-      vectorWeight: 0.7,
-      keywordWeight: 0.3,
-      defaultTopK: 3,
-      minSimilarity: 0.3,
-      embeddingProvider: 'huggingface',
-      embeddingModel: 'BAAI/bge-small-en-v1.5'
-    };
+    if (!client)
+      return {
+        vectorWeight: 0.7,
+        keywordWeight: 0.3,
+        defaultTopK: 3,
+        minSimilarity: 0.3,
+        embeddingProvider: "huggingface",
+        embeddingModel: "BAAI/bge-small-en-v1.5",
+      };
 
     // Get RAG-specific settings from system_configs
-    const vectorWeight = await getConfig('rag_vector_weight');
-    const keywordWeight = await getConfig('rag_keyword_weight');
-    const defaultTopK = await getConfig('rag_default_top_k');
-    const minSimilarity = await getConfig('rag_min_similarity');
-    const embeddingProvider = await getConfig('embedding_provider');
-    const embeddingModel = await getConfig('embedding_model');
+    const vectorWeight = await getConfig("rag_vector_weight");
+    const keywordWeight = await getConfig("rag_keyword_weight");
+    const defaultTopK = await getConfig("rag_default_top_k");
+    const minSimilarity = await getConfig("rag_min_similarity");
+    const embeddingProvider = await getConfig("embedding_provider");
+    const embeddingModel = await getConfig("embedding_model");
 
     return {
       vectorWeight: vectorWeight !== null ? parseFloat(vectorWeight) : 0.7,
       keywordWeight: keywordWeight !== null ? parseFloat(keywordWeight) : 0.3,
       defaultTopK: defaultTopK !== null ? parseInt(defaultTopK) : 3,
       minSimilarity: minSimilarity !== null ? parseFloat(minSimilarity) : 0.3,
-      embeddingProvider: embeddingProvider !== null ? embeddingProvider : 'huggingface',
-      embeddingModel: embeddingModel !== null ? embeddingModel : 'BAAI/bge-small-en-v1.5'
+      embeddingProvider:
+        embeddingProvider !== null ? embeddingProvider : "huggingface",
+      embeddingModel:
+        embeddingModel !== null ? embeddingModel : "BAAI/bge-small-en-v1.5",
     };
   } catch (error: any) {
     console.error("Error getting RAG config:", error.message);
@@ -300,8 +306,8 @@ export const getRagConfig = async (): Promise<RagConfig> => {
       keywordWeight: 0.3,
       defaultTopK: 3,
       minSimilarity: 0.3,
-      embeddingProvider: 'huggingface',
-      embeddingModel: 'BAAI/bge-small-en-v1.5'
+      embeddingProvider: "huggingface",
+      embeddingModel: "BAAI/bge-small-en-v1.5",
     };
   }
 };
@@ -313,16 +319,16 @@ export const updateRagConfig = async (config: RagConfig): Promise<boolean> => {
 
     // Update each RAG setting individually
     const updates = [
-      updateConfig('rag_vector_weight', config.vectorWeight.toString()),
-      updateConfig('rag_keyword_weight', config.keywordWeight.toString()),
-      updateConfig('rag_default_top_k', config.defaultTopK.toString()),
-      updateConfig('rag_min_similarity', config.minSimilarity.toString()),
-      updateConfig('embedding_provider', config.embeddingProvider),
-      updateConfig('embedding_model', config.embeddingModel)
+      updateConfig("rag_vector_weight", config.vectorWeight.toString()),
+      updateConfig("rag_keyword_weight", config.keywordWeight.toString()),
+      updateConfig("rag_default_top_k", config.defaultTopK.toString()),
+      updateConfig("rag_min_similarity", config.minSimilarity.toString()),
+      updateConfig("embedding_provider", config.embeddingProvider),
+      updateConfig("embedding_model", config.embeddingModel),
     ];
 
     const results = await Promise.all(updates);
-    return results.every(result => result);
+    return results.every((result) => result);
   } catch (error: any) {
     console.error("Error updating RAG config:", error.message);
     return false;
@@ -393,9 +399,9 @@ export async function searchByVector(
     if (!client) return [];
     // Convert embedding array to comma-separated string and use PostgreSQL's string_to_array function
     // Use proper similarity calculation: 1 - cosine_distance, which gives 1 for identical vectors and approaches 0 for dissimilar
-    const embeddingStr = embedding.join(',');
+    const embeddingStr = embedding.join(",");
     const query = `
-      SELECT id, content, metadata, (1 - (embedding <=> string_to_array($1, ',')::float4[]::vector)) AS similarity
+      SELECT id, content, metadata, knowledge_base_id, (1 - (embedding <=> string_to_array($1, ',')::float4[]::vector)) AS similarity
       FROM knowledge_chunks
       ORDER BY embedding <=> string_to_array($1, ',')::float4[]::vector
       LIMIT $2;`;
@@ -413,10 +419,10 @@ export async function searchByKeywords(
 ): Promise<KnowledgeChunkResult[]> {
   if (!supabase) return [];
   try {
-    // First try the standard websearch
+    // First try standard websearch
     let { data, error } = await supabase
       .from("knowledge_chunks")
-      .select("id, content, metadata")
+      .select("id, content, metadata, knowledge_base_id")
       .textSearch("content", query, { type: "websearch" })
       .limit(topK);
 
@@ -425,14 +431,17 @@ export async function searchByKeywords(
       // Try a more flexible search that handles Vietnamese text better
       const { data: fuzzyData, error: fuzzyError } = await supabase
         .from("knowledge_chunks")
-        .select("id, content, metadata")
-        .ilike("content", `%${query}%`)  // Case-insensitive partial match
+        .select("id, content, metadata, knowledge_base_id")
+        .ilike("content", `%${query}%`) // Case-insensitive partial match
         .limit(topK);
 
       if (!fuzzyError && fuzzyData && fuzzyData.length > 0) {
         data = fuzzyData;
       } else if (fuzzyError) {
-        console.warn("[Supabase] Fallback keyword search error:", fuzzyError.message);
+        console.warn(
+          "[Supabase] Fallback keyword search error:",
+          fuzzyError.message,
+        );
       }
     }
 
@@ -443,11 +452,42 @@ export async function searchByKeywords(
         id: row.id,
         content: row.content,
         metadata: row.metadata,
+        knowledge_base_id: row.knowledge_base_id,
         similarity: 0.6,
       })) ?? []
     );
   } catch (err: any) {
     console.error("[Supabase] ❌ Keyword search error:", err.message);
+    return [];
+  }
+}
+
+export async function getChunksByKnowledgeBaseId(
+  knowledgeBaseIds: string[],
+): Promise<KnowledgeChunkResult[]> {
+  try {
+    const client = await getClient();
+    if (!client) return [];
+
+    const query = `
+      SELECT id, content, metadata, knowledge_base_id, chunk_index
+      FROM knowledge_chunks
+      WHERE knowledge_base_id = ANY($1)
+      ORDER BY knowledge_base_id, chunk_index;
+    `;
+    const { rows } = await client.query(query, [knowledgeBaseIds]);
+    return rows.map((row: any) => ({
+      id: row.id,
+      content: row.content,
+      metadata: row.metadata,
+      knowledge_base_id: row.knowledge_base_id,
+      similarity: 0.8,
+    }));
+  } catch (err: any) {
+    console.error(
+      "[Supabase] ❌ Error getting chunks by knowledge_base_id:",
+      err.message,
+    );
     return [];
   }
 }

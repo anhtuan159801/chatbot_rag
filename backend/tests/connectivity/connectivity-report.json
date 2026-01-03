@@ -1,0 +1,64 @@
+{
+  "timestamp": "2026-01-03T04:33:00.402Z",
+  "summary": {
+    "total": 5,
+    "connected": 2,
+    "warning": 1,
+    "disconnected": 2
+  },
+  "results": [
+    {
+      "component": "Environment Variables",
+      "status": "disconnected",
+      "message": "Required: 0/4, Optional: 0/2",
+      "dependencies": [
+        "Missing: HUGGINGFACE_API_KEY, GEMINI_API_KEY, FACEBOOK_PAGE_ID, FACEBOOK_ACCESS_TOKEN"
+      ]
+    },
+    {
+      "component": "File Structure",
+      "status": "connected",
+      "message": "Found 13/13 required files",
+      "dependencies": []
+    },
+    {
+      "component": "Service Imports",
+      "status": "warning",
+      "message": "Imported 0/9 services",
+      "dependencies": [
+        "ragService: Error [ERR_MODULE_NOT_FOUND]: Cannot find module 'C:\\AnhTuan\\Anh_Tuan\\Tool\\Chatbot_new\\chatbot_rag\\backend\\tests\\services\\ragService.ts' imported from C:\\AnhTuan\\Anh_Tuan\\Tool\\Chatbot_new\\chatbot_rag\\backend\\tests\\connectivity\\checkConnectivity.ts",
+        "supabaseService: Error [ERR_MODULE_NOT_FOUND]: Cannot find module 'C:\\AnhTuan\\Anh_Tuan\\Tool\\Chatbot_new\\chatbot_rag\\backend\\tests\\services\\supabaseService.ts' imported from C:\\AnhTuan\\Anh_Tuan\\Tool\\Chatbot_new\\chatbot_rag\\backend\\tests\\connectivity\\checkConnectivity.ts",
+        "aiService: Error [ERR_MODULE_NOT_FOUND]: Cannot find module 'C:\\AnhTuan\\Anh_Tuan\\Tool\\Chatbot_new\\chatbot_rag\\backend\\tests\\services\\aiService.ts' imported from C:\\AnhTuan\\Anh_Tuan\\Tool\\Chatbot_new\\chatbot_rag\\backend\\tests\\connectivity\\checkConnectivity.ts",
+        "knowledgeBaseService: Error [ERR_MODULE_NOT_FOUND]: Cannot find module 'C:\\AnhTuan\\Anh_Tuan\\Tool\\Chatbot_new\\chatbot_rag\\backend\\tests\\services\\knowledgeBaseService.ts' imported from C:\\AnhTuan\\Anh_Tuan\\Tool\\Chatbot_new\\chatbot_rag\\backend\\tests\\connectivity\\checkConnectivity.ts",
+        "chunkingService: Error [ERR_MODULE_NOT_FOUND]: Cannot find module 'C:\\AnhTuan\\Anh_Tuan\\Tool\\Chatbot_new\\chatbot_rag\\backend\\tests\\services\\chunkingService.ts' imported from C:\\AnhTuan\\Anh_Tuan\\Tool\\Chatbot_new\\chatbot_rag\\backend\\tests\\connectivity\\checkConnectivity.ts",
+        "textExtractorService: Error [ERR_MODULE_NOT_FOUND]: Cannot find module 'C:\\AnhTuan\\Anh_Tuan\\Tool\\Chatbot_new\\chatbot_rag\\backend\\tests\\services\\textExtractorService.ts' imported from C:\\AnhTuan\\Anh_Tuan\\Tool\\Chatbot_new\\chatbot_rag\\backend\\tests\\connectivity\\checkConnectivity.ts",
+        "storageService: Error [ERR_MODULE_NOT_FOUND]: Cannot find module 'C:\\AnhTuan\\Anh_Tuan\\Tool\\Chatbot_new\\chatbot_rag\\backend\\tests\\services\\storageService.ts' imported from C:\\AnhTuan\\Anh_Tuan\\Tool\\Chatbot_new\\chatbot_rag\\backend\\tests\\connectivity\\checkConnectivity.ts",
+        "cacheService: Error [ERR_MODULE_NOT_FOUND]: Cannot find module 'C:\\AnhTuan\\Anh_Tuan\\Tool\\Chatbot_new\\chatbot_rag\\backend\\tests\\services\\cacheService.ts' imported from C:\\AnhTuan\\Anh_Tuan\\Tool\\Chatbot_new\\chatbot_rag\\backend\\tests\\connectivity\\checkConnectivity.ts",
+        "reRanker: Error [ERR_MODULE_NOT_FOUND]: Cannot find module 'C:\\AnhTuan\\Anh_Tuan\\Tool\\Chatbot_new\\chatbot_rag\\backend\\tests\\services\\reRanker.ts' imported from C:\\AnhTuan\\Anh_Tuan\\Tool\\Chatbot_new\\chatbot_rag\\backend\\tests\\connectivity\\checkConnectivity.ts"
+      ]
+    },
+    {
+      "component": "HuggingFace Connection",
+      "status": "disconnected",
+      "message": "HUGGINGFACE_API_KEY not set"
+    },
+    {
+      "component": "Database Schema",
+      "status": "connected",
+      "message": "Tables: 5/5, pgvector: ✓, uuid-ossp: ✓",
+      "dependencies": []
+    }
+  ],
+  "issues": [
+    "Embedding generation duplicated in knowledgeBaseService.ts and ragService.ts",
+    "Database client wrappers duplicated in multiple files",
+    "Configuration managed in 3 different places (env, database, in-memory)",
+    "No chat history storage implemented",
+    "No session/context management for conversations",
+    "No retry mechanism for AI API calls",
+    "No dead letter queue for failed document processing",
+    "API keys exposed in database queries",
+    "No input sanitization for user queries in RAG search",
+    "No signature verification for Facebook webhook POST requests"
+  ]
+}

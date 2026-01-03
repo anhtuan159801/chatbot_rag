@@ -1,16 +1,16 @@
-import { Client } from 'pg';
-import { InferenceClient } from '@huggingface/inference';
-import 'dotenv/config';
+import { Client } from "pg";
+import { InferenceClient } from "@huggingface/inference";
+import "dotenv/config";
 
 const connectionString = process.env.SUPABASE_URL;
 
 if (!connectionString) {
-  console.error('❌ SUPABASE_URL not set in environment');
+  console.error("❌ SUPABASE_URL not set in environment");
   process.exit(1);
 }
 
 if (!process.env.HUGGINGFACE_API_KEY) {
-  console.error('❌ HUGGINGFACE_API_KEY not set in environment');
+  console.error("❌ HUGGINGFACE_API_KEY not set in environment");
   process.exit(1);
 }
 
@@ -19,9 +19,23 @@ const client = new Client({ connectionString });
 async function reembedKnowledgeBase() {
   try {
     await client.connect();
-    console.log('✓ Connected to database\n');
+    console.log("✓ Connected to database\n");
 
-    const embeddingModel = process.env.EMBEDDING_MODEL || 'BAAI/bge-small-en-v1.5';
+    // Load embedding model from system_configs first, fallback to ENV or default
+    let embeddingModel =
+      process.env.EMBEDDING_MODEL || "BAAI/bge-small-en-v1.5";
+    try {
+      const configResult = await client.query(
+        "SELECT value FROM system_configs WHERE key = 'embedding_model'",
+      );
+      if (configResult.rows.length > 0) {
+        embeddingModel = configResult.rows[0].value;
+      }
+    } catch (e) {
+      console.warn(
+        "⚠ Could not load embedding model from system_configs, using fallback",
+      );
+    }
     console.log(`🤖 Using embedding model: ${embeddingModel}\n`);
 
     const chunksResult = await client.query(`
@@ -31,13 +45,13 @@ async function reembedKnowledgeBase() {
     `);
 
     if (chunksResult.rows.length === 0) {
-      console.log('✓ No chunks found in the database.');
+      console.log("✓ No chunks found in the database.");
       await client.end();
       return;
     }
 
     console.log(`📊 Found ${chunksResult.rows.length} chunks to re-embed\n`);
-    console.log('⏳ Processing chunks...\n');
+    console.log("⏳ Processing chunks...\n");
 
     const hfClient = new InferenceClient(process.env.HUGGINGFACE_API_KEY);
 
@@ -53,7 +67,7 @@ async function reembedKnowledgeBase() {
 
         let embeddingArray: number[] = [];
         if (Array.isArray(embedding)) {
-          if (typeof embedding[0] === 'number') {
+          if (typeof embedding[0] === "number") {
             embeddingArray = embedding as number[];
           } else if (Array.isArray(embedding[0])) {
             embeddingArray = embedding[0] as number[];
@@ -72,7 +86,7 @@ async function reembedKnowledgeBase() {
           SET embedding = string_to_array($1, ',')::float4[]::vector
           WHERE id = $2
         `,
-          [embeddingArray.join(','), chunk.id]
+          [embeddingArray.join(","), chunk.id],
         );
 
         successCount++;
@@ -80,7 +94,7 @@ async function reembedKnowledgeBase() {
 
         if (successCount % 10 === 0) {
           console.log(
-            `📊 Progress: ${successCount}/${chunksResult.rows.length} chunks processed\n`
+            `📊 Progress: ${successCount}/${chunksResult.rows.length} chunks processed\n`,
           );
         }
       } catch (error) {
@@ -91,12 +105,12 @@ async function reembedKnowledgeBase() {
 
     await client.end();
 
-    console.log('\n✓ Re-embedding complete!');
+    console.log("\n✓ Re-embedding complete!");
     console.log(`   ✓ Successful: ${successCount}`);
     console.log(`   ✗ Failed: ${failCount}`);
     console.log(`   📊 Total: ${chunksResult.rows.length}\n`);
   } catch (error) {
-    console.error('❌ Re-embedding error:', error);
+    console.error("❌ Re-embedding error:", error);
     await client.end();
     process.exit(1);
   }
