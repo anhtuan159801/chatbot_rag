@@ -174,7 +174,6 @@ export const getModels = async (): Promise<any[]> => {
     console.error("Error getting AI models:", error.message);
     return [];
   }
-}
 };
 
 export const updateModels = async (
