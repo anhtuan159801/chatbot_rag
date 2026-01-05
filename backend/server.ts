@@ -102,7 +102,7 @@ app.post(
     const VERIFY_TOKEN =
       process.env.FB_VERIFY_TOKEN || "dvc_verify_token_2024_secure";
     const APP_SECRET =
-      process.env.FACEBOOK_APP_SECRET ||
+      process.env.FB_APP_SECRET ||
       process.env.FB_VERIFY_TOKEN ||
       "dvc_verify_token_2024_secure";
     const signature = req.get("X-Hub-Signature-256");
