@@ -32,7 +32,7 @@ export class RAGService {
   private hfClient: InferenceClient;
   private vectorWeight: number = 0.7;
   private keywordWeight: number = 0.3;
-  private minSimilarity: number = 0.3;
+  private minSimilarity: number = 0.1; // Temporarily lowered for debugging
 
   constructor(hfClient: InferenceClient) {
     this.hfClient = hfClient;
