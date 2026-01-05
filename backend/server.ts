@@ -646,10 +646,21 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
         }
 
         console.log("[WEBHOOK] Step 6: 🤖 Generating AI response...");
+
+        // Use API key from database, fallback to environment variable
+        let apiKey = chatbotModel.api_key;
+        if (!apiKey) {
+          const envKey = `${chatbotModel.provider.toUpperCase()}_API_KEY`;
+          apiKey = process.env[envKey];
+          console.log(
+            `[WEBHOOK] Using API key from environment variable: ${envKey}`,
+          );
+        }
+
         const response = await AIService.generateText({
           provider: chatbotModel.provider,
           model: chatbotModel.model_string,
-          apiKey: chatbotModel.api_key,
+          apiKey: apiKey,
           prompt: prompt,
           systemPrompt: systemPrompt,
         });
