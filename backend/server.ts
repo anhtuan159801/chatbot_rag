@@ -67,6 +67,10 @@ app.use((req, res, next) => {
 app.get("/webhooks/facebook", (req, res) => {
   const VERIFY_TOKEN =
     process.env.FB_VERIFY_TOKEN || "dvc_verify_token_2024_secure";
+  const APP_SECRET =
+    process.env.FB_APP_SECRET ||
+    process.env.FB_VERIFY_TOKEN ||
+    "dvc_verify_token_2024_secure";
 
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -97,6 +101,10 @@ app.post(
   async (req, res) => {
     const VERIFY_TOKEN =
       process.env.FB_VERIFY_TOKEN || "dvc_verify_token_2024_secure";
+    const APP_SECRET =
+      process.env.FACEBOOK_APP_SECRET ||
+      process.env.FB_VERIFY_TOKEN ||
+      "dvc_verify_token_2024_secure";
     const signature = req.get("X-Hub-Signature-256");
 
     console.log("Received webhook request:", {
@@ -113,7 +121,7 @@ app.post(
       const isValid = verifyFacebookWebhook({
         payload: req.body,
         signature,
-        secret: VERIFY_TOKEN,
+        secret: APP_SECRET,
       });
 
       if (!isValid) {
@@ -484,6 +492,10 @@ app.post("/api/rag-config", async (req, res) => {
 app.get("/webhooks/facebook", (req, res) => {
   const VERIFY_TOKEN =
     process.env.FB_VERIFY_TOKEN || "dvc_verify_token_2024_secure";
+  const APP_SECRET =
+    process.env.FB_APP_SECRET ||
+    process.env.FB_VERIFY_TOKEN ||
+    "dvc_verify_token_2024_secure";
 
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
