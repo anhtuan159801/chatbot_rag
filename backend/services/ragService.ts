@@ -9,7 +9,7 @@ import { InferenceClient } from "@huggingface/inference";
 import {
   searchByKeywords,
   searchByVector,
-  checkVectorDimension,
+  getChunksByKnowledgeBaseId,
   getRagConfig as getSupabaseRagConfig, // Renamed to avoid conflict
 } from "./supabaseService.js";
 import { reRankResults } from "./reRanker.js";
@@ -82,7 +82,7 @@ export class RAGService {
         this.searchByKeywords(enhancedQuery, topK * 2),
       ]);
 
-      const merged = this.mergeAndRankRRF(vectorResults, keywordResults, topK);
+      let merged = this.mergeAndRankRRF(vectorResults, keywordResults, topK);
 
       console.log(
         `\n[RAG] 📋 Merged search found ${merged.length} relevant chunks:`,
@@ -99,7 +99,30 @@ export class RAGService {
           `[RAG]   Nội dung:\n${chunk.content.substring(0, 500)}${chunk.content.length > 500 ? "..." : ""}`,
         );
       });
-      
+
+      // ** NEW: Expand to full document context **
+      if (merged.length > 0) {
+        console.log("\n[RAG] 📚 Expanding to full document context...");
+        const knowledgeBaseIds = [
+          ...new Set(merged.map((c) => c.knowledge_base_id).filter(Boolean) as string[]),
+        ];
+        if (knowledgeBaseIds.length > 0) {
+          const allChunksFromDocs = await getChunksByKnowledgeBaseId(knowledgeBaseIds);
+          console.log(`[RAG]   Found ${allChunksFromDocs.length} total chunks from ${knowledgeBaseIds.length} documents.`);
+          
+          // Create a map for quick lookup
+          const mergedMap = new Map(merged.map(c => [c.id, c]));
+          // Combine and deduplicate
+          const combined = [...merged];
+          allChunksFromDocs.forEach(chunk => {
+            if (!mergedMap.has(chunk.id)) {
+              combined.push({ ...chunk, source: 'hybrid', similarity: 0 }); // Add similarity if not present
+            }
+          });
+          merged = combined;
+        }
+      }
+
       const finalChunks = await reRankResults(this.hfClient, enhancedQuery, merged);
 
       ragCache.set(cacheKey, finalChunks, this.CACHE_TTL);
@@ -147,7 +170,7 @@ export class RAGService {
     }
     return enhancedQuery;
   }
-  
+
   private async searchByVector(query: string, topK: number) {
     console.log(`[RAG] 🧮 Vector search...`);
     const embedding = await this.generateEmbedding(query);
@@ -212,7 +235,7 @@ export class RAGService {
     const merged = Object.keys(scores)
       .map(id => {
         const chunk = combinedResults[id];
-        chunk.similarity = scores[id]; 
+        chunk.similarity = scores[id];
         chunk.content = this.cleanText(chunk.content);
         return chunk;
       })
@@ -252,7 +275,7 @@ export class RAGService {
           embedding = response[0] as number[];
         }
       }
-      
+
       if (!embedding) {
           throw new Error(`Invalid embedding response format. Expected an array of numbers. Received: ${JSON.stringify(response)}`);
       }

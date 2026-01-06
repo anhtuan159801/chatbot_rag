@@ -397,6 +397,7 @@ export async function checkVectorDimension(
   }
 }
 
+// ** REFACTORED to pass vector array directly **
 export async function searchByVector(
   embedding: number[],
   topK: number = 5,
@@ -404,12 +405,16 @@ export async function searchByVector(
   try {
     const client = await getClient();
     if (!client) return [];
-    const embeddingStr = embedding.join(",");
+
+    // Convert the number array to a string format that PostgreSQL's vector type accepts: '[1,2,3]'
+    const embeddingStr = `[${embedding.join(",")}]`;
+
     const query = `
-      SELECT id, content, metadata, knowledge_base_id, (1 - (embedding <=> string_to_array($1, ',')::float4[]::vector)) AS similarity
+      SELECT id, content, metadata, knowledge_base_id, (1 - (embedding <=> $1::vector)) AS similarity
       FROM knowledge_chunks
-      ORDER BY embedding <=> string_to_array($1, ',')::float4[]::vector
+      ORDER BY embedding <=> $1::vector
       LIMIT $2;`;
+
     const { rows } = await client.query(query, [embeddingStr, topK]);
     return rows || [];
   } catch (err: any) {
@@ -418,6 +423,7 @@ export async function searchByVector(
     throw err;
   }
 }
+
 
 export async function searchByKeywords(
   query: string,
