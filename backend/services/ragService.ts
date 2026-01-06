@@ -10,8 +10,7 @@ import {
   searchByKeywords,
   searchByVector,
   checkVectorDimension,
-  getAiRoles,
-  getModels,
+  getRagConfig as getSupabaseRagConfig, // Renamed to avoid conflict
 } from "./supabaseService.js";
 import { reRankResults } from "./reRanker.js";
 import { ragCache, embeddingCache } from "./cacheService.js";
@@ -29,9 +28,8 @@ export interface KnowledgeChunk {
 export class RAGService {
   private readonly CACHE_TTL = 300_000; // 5 minutes
   private hfClient: InferenceClient;
-  private vectorWeight: number = 0.5; // Default, consider if still needed after RRF
-  private keywordWeight: number = 0.5; // Default, consider if still needed after RRF
   private minSimilarity: number = 0.1;
+  private embeddingModel: string = "";
 
   constructor(hfClient: InferenceClient) {
     this.hfClient = hfClient;
@@ -40,26 +38,15 @@ export class RAGService {
 
   private async loadConfig() {
     try {
-      const { getRagConfig } = await import("./supabaseService.js");
-      const config = await getRagConfig();
-      this.vectorWeight = config.vectorWeight;
-      this.keywordWeight = config.keywordWeight;
+      const config = await getSupabaseRagConfig();
       this.minSimilarity = config.minSimilarity;
+      this.embeddingModel = config.embeddingModel;
+      console.log(`[RAG] Loaded embedding model: ${this.embeddingModel}`);
     } catch (error) {
       console.error(
         "[RAG] Error loading configuration, using defaults:",
         error,
       );
-    }
-  }
-
-  private async getEmbeddingModelConfig(): Promise<string> {
-    try {
-      const { getRagConfig } = await import("./supabaseService.js");
-      const config = await getRagConfig();
-      return config.embeddingModel || "BAAI/bge-small-en-v1.5";
-    } catch (error) {
-      return process.env.EMBEDDING_MODEL || "BAAI/bge-small-en-v1.5";
     }
   }
 
@@ -88,12 +75,6 @@ export class RAGService {
 
     const start = Date.now();
     try {
-      const dim = await checkVectorDimension("knowledge_chunks", "embedding");
-      if (dim && dim !== 384 && dim !== 1024)
-        console.warn(
-          `[RAG] ⚠️ Vector dimension mismatch (DB=${dim}, expected=384 or 1024)`,
-        );
-
       const enhancedQuery = this.enhanceQueryForVietnameseTerms(sanitizedQuery);
 
       const [vectorResults, keywordResults] = await Promise.all([
@@ -101,7 +82,6 @@ export class RAGService {
         this.searchByKeywords(enhancedQuery, topK * 2),
       ]);
 
-      // ** REFACTORED: Use Reciprocal Rank Fusion (RRF) for merging **
       const merged = this.mergeAndRankRRF(vectorResults, keywordResults, topK);
 
       console.log(
@@ -110,7 +90,6 @@ export class RAGService {
       merged.forEach((chunk, i) => {
         const source =
           chunk.metadata?.source || chunk.metadata?.content_url || "Unknown";
-        // RRF score is not a direct similarity, so we can label it as "relevance"
         const relevance = (chunk.similarity * 100).toFixed(1);
         console.log(
           `\n[RAG]   ─── Chunk ${i + 1} (Relevance Score: ${relevance}) ───`,
@@ -121,13 +100,7 @@ export class RAGService {
         );
       });
       
-      // ** REFACTORED: Re-ranking is now the final step before returning **
-      // The re-ranker is currently disabled, but if enabled, it would process `merged` results.
       const finalChunks = await reRankResults(this.hfClient, enhancedQuery, merged);
-
-      // ** REMOVED: The problematic logic that fetched all chunks from a document **
-      // This was the primary source of context noise. The system now relies only on
-      // the most relevant chunks identified by the hybrid search.
 
       ragCache.set(cacheKey, finalChunks, this.CACHE_TTL);
       const ms = Date.now() - start;
@@ -188,7 +161,8 @@ export class RAGService {
       }));
     } catch (err) {
       console.error("[RAG] ❌ Vector search failed:", err);
-      return [];
+      // Re-throwing the error to be caught by the main pipeline
+      throw err;
     }
   }
 
@@ -196,8 +170,6 @@ export class RAGService {
     console.log(`[RAG] 🔑 Keyword search...`);
     try {
       const results = await searchByKeywords(query, topK);
-      // ** Note: `searchByKeywords` from supabaseService returns a constant similarity.
-      // RRF merger handles this gracefully by relying on rank instead of score.
       return results.map((r) => ({
         ...r,
         source: "keyword" as const,
@@ -208,11 +180,6 @@ export class RAGService {
     }
   }
 
-  /**
-   * ** NEW: Merge results using Reciprocal Rank Fusion (RRF) **
-   * This method is more robust than weighted sums when dealing with
-   * scores from different, un-normalized systems.
-   */
   private mergeAndRankRRF(
     vectorResults: KnowledgeChunk[],
     keywordResults: KnowledgeChunk[],
@@ -222,7 +189,6 @@ export class RAGService {
     const scores: { [id: string]: number } = {};
     const combinedResults: { [id: string]: KnowledgeChunk } = {};
 
-    // Calculate RRF scores from vector results
     vectorResults.forEach((result, index) => {
       const rank = index + 1;
       const rrfScore = 1 / (k + rank);
@@ -232,17 +198,13 @@ export class RAGService {
       }
     });
 
-    // Calculate RRF scores from keyword results
     keywordResults.forEach((result, index) => {
       const rank = index + 1;
       const rrfScore = 1 / (k + rank);
       scores[result.id] = (scores[result.id] || 0) + rrfScore;
       if (!combinedResults[result.id]) {
         combinedResults[result.id] = { ...result, source: 'hybrid' };
-      }
-      // Since keyword search might not provide a meaningful similarity,
-      // we ensure the vector one is used if available.
-      else if (combinedResults[result.id].source !== 'vector') {
+      } else if (combinedResults[result.id].source !== 'vector') {
           combinedResults[result.id].similarity = result.similarity;
       }
     });
@@ -250,52 +212,48 @@ export class RAGService {
     const merged = Object.keys(scores)
       .map(id => {
         const chunk = combinedResults[id];
-        // The new 'similarity' is the RRF score. It's not a true similarity
-        // but a relevance score.
         chunk.similarity = scores[id]; 
         chunk.content = this.cleanText(chunk.content);
         return chunk;
       })
-      // Filter out results with very low relevance
-      .filter(chunk => chunk.similarity > 1 / (k + 100)); // Keep chunks that ranked within the top ~100
+      .filter(chunk => chunk.similarity > 1 / (k + 100));
 
-    // Sort by the new RRF score in descending order
     return merged.sort((a, b) => b.similarity - a.similarity).slice(0, topK);
   }
 
+  // ** REFACTORED for simplicity and correctness **
   private async generateEmbedding(text: string): Promise<number[] | null> {
-    const cacheKey = embeddingCache.getCacheKey("embedding", {
-      text: text.substring(0, 200),
-    });
+    const cacheKey = embeddingCache.getCacheKey("embedding", { model: this.embeddingModel, text: text.substring(0, 200) });
     const cached = embeddingCache.get<number[]>(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+      console.log("[RAG] Embedding cache hit.")
+      return cached;
+    }
+
+    console.log(`[RAG] Generating embedding for text using model: ${this.embeddingModel}`);
 
     try {
-      let modelName = await this.getEmbeddingModelConfig();
-      if (!modelName || modelName === "BAAI/bge-small-en-v1.5") {
-        try {
-          const roles = await getAiRoles();
-          const ragModelId = roles.rag;
-          const models = await getModels();
-          const embeddingModel = models.find((m) => m.id === ragModelId);
-          if (embeddingModel?.model_string) {
-            modelName = embeddingModel.model_string;
-          }
-        } catch (e) {}
+       if (!this.embeddingModel) {
+          throw new Error("Embedding model is not configured.");
       }
 
       const response = await this.hfClient.featureExtraction({
-        model: modelName,
+        model: this.embeddingModel,
         inputs: text,
       });
 
-      const emb = Array.isArray(response[0]) ? response[0] : response;
-      const embedding = emb as number[];
+      const embedding = (Array.isArray(response) && Array.isArray(response[0])) ? response[0] : response as number[];
+      
+      if (!embedding || !Array.isArray(embedding)) {
+          throw new Error(`Invalid embedding response format. Expected an array of numbers. Received: ${JSON.stringify(response)}`);
+      }
+
+      console.log(`[RAG] ✅ Embedding generated with dimension: ${embedding.length}`);
 
       embeddingCache.set(cacheKey, embedding);
       return embedding;
     } catch (err) {
-      console.error("[RAG] ❌ Embedding generation failed:", err);
+      console.error(`[RAG] ❌ Embedding generation failed for model ${this.embeddingModel}:`, err);
       return null;
     }
   }
@@ -331,7 +289,6 @@ export class RAGService {
         const sourceUrl =
           chunk.metadata?.content_url || chunk.metadata?.source || "";
         const sourceInfo = sourceUrl ? `\n(Nguồn: ${sourceUrl})` : "";
-        // The score is now an RRF score, so we can call it "Relevance"
         const relevanceInfo = `\n(Độ liên quan: ${(chunk.similarity * 100).toFixed(1)}%)`;
         return `[TÀI LIỆU ${index + 1}]:\n${chunk.content}${sourceInfo}${relevanceInfo}\n`;
       })
