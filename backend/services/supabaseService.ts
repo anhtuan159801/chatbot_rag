@@ -1,9 +1,9 @@
 /**
  * supabaseService.ts
- * -------------------------------------
+ * ------------------------------------
  * Handles all Supabase + PostgreSQL queries for RAG
  * Supports pgvector & text search
- * -------------------------------------
+ * ------------------------------------
  */
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
@@ -165,7 +165,6 @@ export const getModels = async (): Promise<any[]> => {
   try {
     const client = await getClient();
     if (!client) return [];
-    // SECURITY: Removed api_key from SELECT to prevent API key exposure
     const result = await client.query(
       "SELECT id, provider, name, model_string, is_active FROM ai_models ORDER BY name ASC",
     );
@@ -257,7 +256,6 @@ export const updateAiRoles = async (
   }
 };
 
-// RAG Configuration functions
 export interface RagConfig {
   vectorWeight: number;
   keywordWeight: number;
@@ -267,56 +265,67 @@ export interface RagConfig {
   embeddingModel: string;
 }
 
+// ** REFACTORED to prioritize DB-configured embedding model **
 export const getRagConfig = async (): Promise<RagConfig> => {
+  const defaultConfig = {
+      vectorWeight: 0.7,
+      keywordWeight: 0.3,
+      defaultTopK: 5,
+      minSimilarity: 0.2,
+      embeddingProvider: "huggingface",
+      embeddingModel: process.env.EMBEDDING_MODEL || "BAAI/bge-small-en-v1.5",
+  };
+
   try {
     const client = await getClient();
-    if (!client)
-      return {
-        vectorWeight: 0.7,
-        keywordWeight: 0.3,
-        defaultTopK: 3,
-        minSimilarity: 0.3,
-        embeddingProvider: "huggingface",
-        embeddingModel: "BAAI/bge-small-en-v1.5",
-      };
+    if (!client) return defaultConfig;
 
-    // Get RAG-specific settings from system_configs
+    // 1. Get embedding model from AI Roles and Models first
+    let dbEmbeddingModel: string | null = null;
+    try {
+        const roles = await getAiRoles();
+        const ragModelId = roles.rag;
+        if (ragModelId) {
+            const models = await getModels();
+            const embeddingModel = models.find((m) => m.id === ragModelId);
+            if (embeddingModel?.model_string) {
+                dbEmbeddingModel = embeddingModel.model_string;
+                console.log(`[Supabase] ✅ Found embedding model from DB roles: ${dbEmbeddingModel}`);
+            }
+        }
+    } catch (e) {
+        console.warn("[Supabase] ⚠️ Could not fetch embedding model from roles, checking system_configs.", e);
+    }
+
+    // 2. Fallback to system_configs
     const vectorWeight = await getConfig("rag_vector_weight");
     const keywordWeight = await getConfig("rag_keyword_weight");
     const defaultTopK = await getConfig("rag_default_top_k");
     const minSimilarity = await getConfig("rag_min_similarity");
     const embeddingProvider = await getConfig("embedding_provider");
-    const embeddingModel = await getConfig("embedding_model");
+    const configEmbeddingModel = await getConfig("embedding_model");
+
+     const finalEmbeddingModel = dbEmbeddingModel || configEmbeddingModel || defaultConfig.embeddingModel;
 
     return {
-      vectorWeight: vectorWeight !== null ? parseFloat(vectorWeight) : 0.7,
-      keywordWeight: keywordWeight !== null ? parseFloat(keywordWeight) : 0.3,
-      defaultTopK: defaultTopK !== null ? parseInt(defaultTopK) : 3,
-      minSimilarity: minSimilarity !== null ? parseFloat(minSimilarity) : 0.3,
-      embeddingProvider:
-        embeddingProvider !== null ? embeddingProvider : "huggingface",
-      embeddingModel:
-        embeddingModel !== null ? embeddingModel : "BAAI/bge-small-en-v1.5",
+      vectorWeight: vectorWeight !== null ? parseFloat(vectorWeight) : defaultConfig.vectorWeight,
+      keywordWeight: keywordWeight !== null ? parseFloat(keywordWeight) : defaultConfig.keywordWeight,
+      defaultTopK: defaultTopK !== null ? parseInt(defaultTopK) : defaultConfig.defaultTopK,
+      minSimilarity: minSimilarity !== null ? parseFloat(minSimilarity) : defaultConfig.minSimilarity,
+      embeddingProvider: embeddingProvider || defaultConfig.embeddingProvider,
+      embeddingModel: finalEmbeddingModel,
     };
   } catch (error: any) {
-    console.error("Error getting RAG config:", error.message);
-    return {
-      vectorWeight: 0.7,
-      keywordWeight: 0.3,
-      defaultTopK: 3,
-      minSimilarity: 0.3,
-      embeddingProvider: "huggingface",
-      embeddingModel: "BAAI/bge-small-en-v1.5",
-    };
+    console.error("[Supabase] ❌ Error getting RAG config, returning defaults:", error.message);
+    return defaultConfig;
   }
 };
+
 
 export const updateRagConfig = async (config: RagConfig): Promise<boolean> => {
   try {
     const client = await getClient();
     if (!client) return false;
-
-    // Update each RAG setting individually
     const updates = [
       updateConfig("rag_vector_weight", config.vectorWeight.toString()),
       updateConfig("rag_keyword_weight", config.keywordWeight.toString()),
@@ -325,7 +334,6 @@ export const updateRagConfig = async (config: RagConfig): Promise<boolean> => {
       updateConfig("embedding_provider", config.embeddingProvider),
       updateConfig("embedding_model", config.embeddingModel),
     ];
-
     const results = await Promise.all(updates);
     return results.every((result) => result);
   } catch (error: any) {
@@ -396,8 +404,6 @@ export async function searchByVector(
   try {
     const client = await getClient();
     if (!client) return [];
-    // Convert embedding array to comma-separated string and use PostgreSQL's string_to_array function
-    // Use proper similarity calculation: 1 - cosine_distance, which gives 1 for identical vectors and approaches 0 for dissimilar
     const embeddingStr = embedding.join(",");
     const query = `
       SELECT id, content, metadata, knowledge_base_id, (1 - (embedding <=> string_to_array($1, ',')::float4[]::vector)) AS similarity
@@ -408,7 +414,8 @@ export async function searchByVector(
     return rows || [];
   } catch (err: any) {
     console.error("[Supabase] ❌ Vector search failed:", err.message);
-    return [];
+    // Propagate the error to be handled by the RAG service
+    throw err;
   }
 }
 
@@ -418,20 +425,17 @@ export async function searchByKeywords(
 ): Promise<KnowledgeChunkResult[]> {
   if (!supabase) return [];
   try {
-    // First try standard websearch
     let { data, error } = await supabase
       .from("knowledge_chunks")
       .select("id, content, metadata, knowledge_base_id")
       .textSearch("content", query, { type: "websearch" })
       .limit(topK);
 
-    // If no results from websearch, try a more flexible search for Vietnamese content
     if (!error && (!data || data.length === 0)) {
-      // Try a more flexible search that handles Vietnamese text better
       const { data: fuzzyData, error: fuzzyError } = await supabase
         .from("knowledge_chunks")
         .select("id, content, metadata, knowledge_base_id")
-        .ilike("content", `%${query}%`) // Case-insensitive partial match
+        .ilike("content", `%${query}%`)
         .limit(topK);
 
       if (!fuzzyError && fuzzyData && fuzzyData.length > 0) {
@@ -452,6 +456,7 @@ export async function searchByKeywords(
         content: row.content,
         metadata: row.metadata,
         knowledge_base_id: row.knowledge_base_id,
+        // This similarity is a placeholder, RRF merger in ragService handles it
         similarity: 0.6,
       })) ?? []
     );
@@ -480,7 +485,7 @@ export async function getChunksByKnowledgeBaseId(
       content: row.content,
       metadata: row.metadata,
       knowledge_base_id: row.knowledge_base_id,
-      similarity: 0.8,
+      similarity: 0.8, // This is a placeholder
     }));
   } catch (err: any) {
     console.error(
