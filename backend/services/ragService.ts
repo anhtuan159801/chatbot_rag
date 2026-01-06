@@ -11,6 +11,7 @@ import {
   searchByVector,
   getChunksByKnowledgeBaseId,
   getRagConfig as getSupabaseRagConfig, // Renamed to avoid conflict
+  checkVectorDimension,
 } from "./supabaseService.js";
 import { reRankResults } from "./reRanker.js";
 import { ragCache, embeddingCache } from "./cacheService.js";
@@ -40,7 +41,30 @@ export class RAGService {
     try {
       const config = await getSupabaseRagConfig();
       this.minSimilarity = config.minSimilarity;
-      this.embeddingModel = config.embeddingModel;
+      let model = config.embeddingModel;
+
+      // Align embedding model with the dimension stored in the vector column
+      const columnDimension = await checkVectorDimension();
+      const modelDimension = this.getModelDimension(model);
+      if (
+        columnDimension &&
+        modelDimension &&
+        modelDimension !== columnDimension
+      ) {
+        const fallback = this.getFallbackModelForDimension(columnDimension);
+        if (fallback) {
+          console.warn(
+            `[RAG] Embedding model ${model} has dimension ${modelDimension}, but DB column is ${columnDimension}. Switching to ${fallback} to match stored embeddings.`,
+          );
+          model = fallback;
+        } else {
+          console.warn(
+            `[RAG] Embedding model dimension ${modelDimension} does not match DB column dimension ${columnDimension}. Consider re-embedding your knowledge base or updating the model.`,
+          );
+        }
+      }
+
+      this.embeddingModel = model;
       console.log(`[RAG] Loaded embedding model: ${this.embeddingModel}`);
     } catch (error) {
       console.error(
@@ -295,6 +319,29 @@ export class RAGService {
       .replace(/<\/?[^>]+(>|$)/g, "")
       .replace(/\s+/g, " ")
       .trim();
+  }
+
+  private getModelDimension(model: string): number | null {
+    const knownDims: Record<string, number> = {
+      "BAAI/bge-small-en-v1.5": 384,
+      "sentence-transformers/all-MiniLM-L6-v2": 384,
+      "intfloat/multilingual-e5-small": 384,
+      "BAAI/bge-base-en-v1.5": 768,
+      "intfloat/multilingual-e5-base": 768,
+      "BAAI/bge-large-en-v1.5": 1024,
+      "Qwen/Qwen3-Embedding-8B": 4096,
+    };
+    return knownDims[model] ?? null;
+  }
+
+  private getFallbackModelForDimension(dimension: number): string | null {
+    const fallbackByDim: Record<number, string> = {
+      384: "BAAI/bge-small-en-v1.5",
+      768: "BAAI/bge-base-en-v1.5",
+      1024: "BAAI/bge-large-en-v1.5",
+      4096: "Qwen/Qwen3-Embedding-8B",
+    };
+    return fallbackByDim[dimension] ?? null;
   }
 
   formatContext(chunks: KnowledgeChunk[]): string {

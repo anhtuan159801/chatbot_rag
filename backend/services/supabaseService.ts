@@ -384,10 +384,14 @@ export async function checkVectorDimension(
     const client = await getClient();
     if (!client) return null;
     const res = await client.query(
-      `SELECT attndims FROM pg_attribute WHERE attrelid = $1::regclass AND attname = $2;`,
+      `SELECT CASE WHEN a.atttypmod > 4 THEN a.atttypmod - 4 ELSE NULL END AS dimension
+       FROM pg_attribute a
+       WHERE a.attrelid = $1::regclass
+         AND a.attname = $2
+       LIMIT 1;`,
       [table, column],
     );
-    return res.rows[0]?.attndims ?? null;
+    return res.rows[0]?.dimension ?? null;
   } catch (err: any) {
     console.error(
       "[Supabase] ⚠️ Error checking vector dimension:",
@@ -406,8 +410,25 @@ export async function searchByVector(
     const client = await getClient();
     if (!client) return [];
 
+    // Ensure embedding length matches column dimension to avoid pgvector errors
+    const expectedDim = await checkVectorDimension();
+    let adjustedEmbedding = embedding;
+
+    if (expectedDim && embedding.length !== expectedDim) {
+      console.warn(
+        `[Supabase] Vector dimension mismatch: got ${embedding.length}, expected ${expectedDim}. Adjusting embedding to match column.`,
+      );
+
+      if (embedding.length > expectedDim) {
+        adjustedEmbedding = embedding.slice(0, expectedDim);
+      } else {
+        const padding = new Array(expectedDim - embedding.length).fill(0);
+        adjustedEmbedding = [...embedding, ...padding];
+      }
+    }
+
     // Convert the number array to a string format that PostgreSQL's vector type accepts: '[1,2,3]'
-    const embeddingStr = `[${embedding.join(",")}]`;
+    const embeddingStr = `[${adjustedEmbedding.join(",")}]`;
 
     const query = `
       SELECT id, content, metadata, knowledge_base_id, (1 - (embedding <=> $1::vector)) AS similarity
