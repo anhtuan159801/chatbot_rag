@@ -242,9 +242,18 @@ export class RAGService {
         inputs: text,
       });
 
-      const embedding = (Array.isArray(response) && Array.isArray(response[0])) ? response[0] : response as number[];
+      // ** FIX for TypeScript build error **
+      // Explicitly handle the two possible return types from featureExtraction
+      let embedding: number[] | null = null;
+      if (Array.isArray(response) && response.length > 0) {
+        if (typeof response[0] === 'number') {
+          embedding = response as number[];
+        } else if (Array.isArray(response[0])) {
+          embedding = response[0] as number[];
+        }
+      }
       
-      if (!embedding || !Array.isArray(embedding)) {
+      if (!embedding) {
           throw new Error(`Invalid embedding response format. Expected an array of numbers. Received: ${JSON.stringify(response)}`);
       }
 
