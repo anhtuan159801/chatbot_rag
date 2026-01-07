@@ -383,6 +383,19 @@ export async function checkVectorDimension(
   try {
     const client = await getClient();
     if (!client) return null;
+
+    // 1) Read the dimension from an existing stored vector to avoid atttypmod discrepancies
+    const sampleDim = await client.query(
+      `SELECT vector_dims(${column}) AS dimension
+       FROM ${table}
+       WHERE ${column} IS NOT NULL
+       LIMIT 1;`,
+    );
+    if (sampleDim.rows[0]?.dimension) {
+      return sampleDim.rows[0].dimension;
+    }
+
+    // 2) Fallback: derive from atttypmod (dimension + 4)
     const res = await client.query(
       `SELECT CASE WHEN a.atttypmod > 4 THEN a.atttypmod - 4 ELSE NULL END AS dimension
        FROM pg_attribute a
