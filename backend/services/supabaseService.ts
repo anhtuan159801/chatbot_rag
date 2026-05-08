@@ -11,7 +11,8 @@ import { Client } from "pg";
 const envSupabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY;
 let dbUrl = process.env.SUPABASE_DB_URL;
-if (!dbUrl && envSupabaseUrl && envSupabaseUrl.startsWith("postgresql://")) {
+
+if (!dbUrl && envSupabaseUrl && envSupabaseUrl.startsWith("postgresql://") && envSupabaseUrl.includes("supabase")) {
   dbUrl = envSupabaseUrl;
   console.log("[Supabase] Detected database URL from SUPABASE_URL");
 }
