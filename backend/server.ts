@@ -15,7 +15,8 @@ import {
   updateAiRoles,
   initializeSystemData,
 } from "./services/supabaseService.js";
-import { config } from "./src/config/index.js";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -598,7 +599,7 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
       }
 
       // Fallback to config if no model in database
-      if (!chatbotModel && config.ai.gemini.apiKey) {
+      if (!chatbotModel && GEMINI_API_KEY) {
         console.warn(
           "[WEBHOOK] ⚠ No model in database, using config fallback",
         );
@@ -606,8 +607,8 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
           id: "config-gemini",
           provider: "gemini",
           name: "Gemini (Config)",
-          model_string: config.ai.gemini.model,
-          api_key: config.ai.gemini.apiKey,
+          model_string: GEMINI_MODEL,
+          api_key: GEMINI_API_KEY,
           is_active: true,
         };
       }
