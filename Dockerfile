@@ -7,7 +7,6 @@ RUN cd backend && npm install --ignore-scripts --no-audit --no-fund
 
 COPY backend ./backend/
 
-ENV GEMINI_API_KEY=AIzaSyDM1plwdxfryE6r-bOMWE0ZP_IrkPbz4D0
 ENV GEMINI_MODEL=gemini-3-flash-preview
 ENV PORT=8080
 

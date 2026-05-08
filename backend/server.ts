@@ -15,8 +15,8 @@ import {
   updateAiRoles,
   initializeSystemData,
 } from "./services/supabaseService.js";
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
+const GEMINI_API_KEY = "AIzaSyDM1plwdxfryE6r-bOMWE0ZP_IrkPbz4D0";
+const GEMINI_MODEL = "gemini-3-flash-preview";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
