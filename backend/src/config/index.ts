@@ -18,10 +18,14 @@ export const config = {
     key: process.env.SUPABASE_KEY || '',
   },
   ai: {
-    defaultProvider: process.env.DEFAULT_AI_PROVIDER || 'openai',
+    defaultProvider: process.env.DEFAULT_AI_PROVIDER || 'openrouter',
     openai: {
       apiKey: process.env.OPENAI_API_KEY || '',
       model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    },
+    openrouter: {
+      apiKey: process.env.OPENROUTER_API_KEY || '',
+      model: process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-001',
     },
     gemini: {
       apiKey: process.env.GEMINI_API_KEY || '',

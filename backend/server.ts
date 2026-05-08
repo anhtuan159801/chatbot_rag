@@ -15,11 +15,14 @@ import {
   updateAiRoles,
   initializeSystemData,
 } from "./services/supabaseService.js";
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "AIzaSyDM1plwdxfryE6r-bOMWE0ZP_IrkPbz4D0";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "google/gemini-2.0-flash-001";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -603,8 +606,17 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
 
       // Fallback to config if no model in database
       const defaultProvider = config.ai.defaultProvider;
-      const fallbackApiKey = defaultProvider === 'openai' ? OPENAI_API_KEY : (defaultProvider === 'gemini' ? GEMINI_API_KEY : '');
-      const fallbackModel = defaultProvider === 'openai' ? OPENAI_MODEL : (defaultProvider === 'gemini' ? GEMINI_MODEL : 'gpt-4o-mini');
+      const getProviderConfig = (provider: string) => {
+        switch (provider) {
+          case 'openrouter': return { key: OPENROUTER_API_KEY, model: OPENROUTER_MODEL };
+          case 'openai': return { key: OPENAI_API_KEY, model: OPENAI_MODEL };
+          case 'gemini': return { key: GEMINI_API_KEY, model: GEMINI_MODEL };
+          default: return { key: OPENROUTER_API_KEY, model: OPENROUTER_MODEL };
+        }
+      };
+      const providerConfig = getProviderConfig(defaultProvider);
+      const fallbackApiKey = providerConfig.key;
+      const fallbackModel = providerConfig.model;
 
       if (!chatbotModel && fallbackApiKey) {
         console.warn(
