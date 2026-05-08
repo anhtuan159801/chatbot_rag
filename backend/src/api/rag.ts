@@ -5,20 +5,14 @@ import {
   ChatRequest,
   ChatResponse,
   ErrorResponse,
-  HealthResponse,
 } from "../models/api.js";
 import { generateToken } from "../../middleware/auth.js";
-import { RAGService } from "../../services/ragService.js";
 
 const router = express.Router();
 
 router.post("/ask", async (req, res) => {
   try {
-    const {
-      question,
-      sessionId,
-      topK = config.rag.defaultTopK,
-    } = req.body as ChatRequest;
+    const { question } = req.body as ChatRequest;
 
     if (!question || question.trim().length === 0) {
       res.status(400).json({
@@ -31,29 +25,6 @@ router.post("/ask", async (req, res) => {
 
     const startTime = Date.now();
 
-    const hfClient = new InferenceClient(config.ai.huggingface.apiKey || "");
-    const ragService = new RAGService(hfClient);
-
-    const chunks = await ragService.searchKnowledge(question, topK);
-
-    if (chunks.length === 0) {
-      res.json({
-        answer:
-          "Xin lỗi, tôi không tìm thấy thông tin liên quan trong cơ sở dữ liệu. Vui lòng đặt câu hỏi khác hoặc liên hệ quản trị viên.",
-        sources: [],
-        metadata: {
-          model: config.ai.gemini.model,
-          latency: Date.now() - startTime,
-          chunksRetrieved: 0,
-        },
-      } as ChatResponse);
-      return;
-    }
-
-    const context = ragService.formatContext(chunks);
-
-    const prompt = `${context}\n\nDựa trên các thông tin trên, hãy trả lời câu hỏi: ${question}\n\nTrả lời bằng tiếng Việt, ngắn gọn và dễ hiểu.`;
-
     let answer = "";
     const provider = config.ai.gemini.apiKey ? "gemini" : "huggingface";
     const model = config.ai.gemini.model;
@@ -61,14 +32,8 @@ router.post("/ask", async (req, res) => {
     if (provider === "gemini") {
       try {
         const apiKey = config.ai.gemini.apiKey;
-        const messages = [
-          {
-            role: "system",
-            content:
-              "Bạn là Trợ lý ảo Hỗ trợ Thủ tục Hành chính công. Nhiệm vụ của bạn là hướng dẫn công dân chuẩn bị hồ sơ, giải đáp thắc mắc về quy trình, lệ phí và thời gian giải quyết một cách chính xác, lịch sự và căn cứ theo văn bản pháp luật hiện hành. Tuyệt đối không tư vấn các nội dung trái pháp luật.",
-          },
-          { role: "user", content: prompt },
-        ];
+
+        const prompt = `Bạn là Trợ lý ảo Hỗ trợ Thủ tục Hành chính công. Nhiệm vụ của bạn là hướng dẫn công dân chuẩn bị hồ sơ, giải đáp thắc mắc về quy trình, lệ phí và thời gian giải quyết một cách chính xác, lịch sự và căn cứ theo văn bản pháp luật hiện hành. Tuyệt đối không tư vấn các nội dung trái pháp luật. Hãy trả lời câu hỏi sau bằng tiếng Việt, ngắn gọn và dễ hiểu:\n\nCâu hỏi: ${question}`;
 
         const response = await fetch(
           "https://generativelanguage.googleapis.com/v1beta/models/" +
@@ -93,7 +58,7 @@ router.post("/ask", async (req, res) => {
               generationConfig: {
                 responseMimeType: "text/plain",
                 temperature: 0.7,
-                maxOutputTokens: 1000,
+                maxOutputTokens: 2048,
               },
             }),
           },
@@ -113,6 +78,8 @@ router.post("/ask", async (req, res) => {
       try {
         const client = new InferenceClient(config.ai.huggingface.apiKey);
 
+        const prompt = `Bạn là Trợ lý ảo Hỗ trợ Thủ tục Hành chính công. Nhiệm vụ của bạn là hướng dẫn công dân chuẩn bị hồ sơ, giải đáp thắc mắc về quy trình, lệ phí và thời gian giải quyết một cách chính xác, lịch sự và căn cứ theo văn bản pháp luật hiện hành. Tuyệt đối không tư vấn các nội dung trái pháp luật. Hãy trả lời câu hỏi sau bằng tiếng Việt, ngắn gọn và dễ hiểu:\n\nCâu hỏi: ${question}`;
+
         const result = await client.textGeneration({
           model:
             config.ai.huggingface.apiKey ||
@@ -131,15 +98,11 @@ router.post("/ask", async (req, res) => {
 
     res.json({
       answer: answer || "Không có phản hồi từ AI.",
-      sources: chunks.map((c: any) => ({
-        id: c.id,
-        content: c.content.substring(0, 200) + "...",
-        similarity: c.similarity,
-      })),
+      sources: [],
       metadata: {
         model: model,
         latency,
-        chunksRetrieved: chunks.length,
+        chunksRetrieved: 0,
       },
     } as ChatResponse);
   } catch (error: any) {
