@@ -16,7 +16,7 @@ import {
   initializeSystemData,
 } from "./services/supabaseService.js";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -632,35 +632,9 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
         );
 
         // RAG: Search knowledge base for relevant chunks
-        console.log("[WEBHOOK] Step 5: 🔍 Searching knowledge base...");
-        // Get the default topK from config
-        const { getRagConfig } = await import("./services/supabaseService.js");
-        const ragConfig = await getRagConfig();
-        const topK = ragConfig.defaultTopK || 3;
+        console.log("[WEBHOOK] Step 5: Skipping RAG - direct AI response");
 
-        const relevantChunks = await ragServiceInstance.searchKnowledge(
-          message_text,
-          topK,
-        );
-        let ragContext = "";
-
-        if (relevantChunks.length > 0) {
-          ragContext = ragServiceInstance.formatContext(relevantChunks);
-          console.log(
-            `[WEBHOOK] ✓ Found ${relevantChunks.length} relevant knowledge chunks`,
-          );
-        } else {
-          console.log(
-            "[WEBHOOK] ⚠ No relevant knowledge chunks found, using general response",
-          );
-        }
-
-        let prompt = "";
-        if (ragContext) {
-          prompt = `${systemPrompt}\n\n${ragContext}\n\nCâu hỏi cụ thể từ người dùng: "${message_text}"\n\nHƯỚNG DẪN TRẢ LỜI:\n1. Dựa PRIMARILY trên các tài liệu đã cung cấp ở trên để trả lời câu hỏi.\n2. Nếu tài liệu có thông tin liên quan, hãy trích dẫn và sử dụng thông tin đó.\n3. Nếu tài liệu không có thông tin cụ thể, hãy tổng hợp thông tin chung từ các tài liệu có liên quan.\n4. Trả lời bằng tiếng Việt, ngắn gọn, súc tích, dễ hiểu và không sử dụng markdown.\n5. CHỈ liệt kê đường dẫn tham khảo ở cuối câu trả lời nếu thực SỰ tồn tại trong phần "CÁC NGUỒN THAM KHẢO". Nếu phần này ghi "Hiện không có đường dẫn tham khảo cụ thể từ tài liệu" hoặc không có phần này, thì KHÔNG ĐƯỢC tạo ra các đường dẫn giả tạo.\n6. Cấu trúc trả lời: Mở đầu thân mật -> Nội dung chính -> Đường dẫn tham khảo (nếu CÓ THẬT SỰ) -> Kết thúc lịch sự.\n7. PHÙ HỢP câu trả lời với cách hỏi cụ thể của người dùng. Nếu người dùng hỏi theo cách thân mật (ví dụ: "Tôi có thằng con trai..."), hãy trả lời thân mật, sử dụng từ xưng hô phù hợp ("bác", "cháu"). Nếu người dùng hỏi trang trọng hơn, hãy trả lời trang trọng hơn.\n8. Nếu thực sự không có thông tin liên quan trong bất kỳ tài liệu nào, mới thông báo là không tìm thấy thông tin cụ thể.`;
-        } else {
-          prompt = `${systemPrompt}\n\nCâu hỏi: ${message_text}\n\nHãy trả lời bằng tiếng Việt, ngắn gọn, dễ hiểu và không sử dụng markdown.`;
-        }
+        const prompt = `${systemPrompt}\n\nCâu hỏi: ${message_text}\n\nHãy trả lời bằng tiếng Việt, ngắn gọn, dễ hiểu và không sử dụng markdown.`;
 
         console.log("[WEBHOOK] Step 6: 🤖 Generating AI response...");
 
