@@ -776,7 +776,11 @@ app.get("*", (req, res) => {
 const initializeSystem = async () => {
   try {
     await initializeSystemData();
+  } catch (err) {
+    console.warn("[System] ⚠️ Database not available, skipping system data init");
+  }
 
+  try {
     // Load Facebook config from environment variables first, then database
     fbConfig = {
       pageId: process.env.FACEBOOK_PAGE_ID || "",
@@ -795,23 +799,29 @@ const initializeSystem = async () => {
         };
       }
     }
+  } catch (err) {
+    console.warn("[System] ⚠️ Facebook config load failed, using env vars");
+  }
 
+  try {
     modelConfigs = await getModels();
     aiRoles = await getAiRoles();
-
-    // Add system prompt to aiRoles
-    const systemPrompt = await getConfig("system_prompt");
-    if (systemPrompt) {
-      aiRoles.systemPrompt = systemPrompt;
-    }
-
-    console.log("System configurations loaded (env vars + Supabase)");
-    console.log(
-      `Facebook config: pageId=${fbConfig.pageId}, pageName=${fbConfig.pageName}`,
-    );
-  } catch (error) {
-    console.error("Error initializing system data:", error);
+  } catch (err) {
+    console.warn("[System] ⚠️ Models/Roles load failed, using fallback");
+    modelConfigs = [];
+    aiRoles = { chatbotText: "config-gemini", chatbotVoice: "config-gemini" };
   }
+
+  // Add system prompt to aiRoles (default if not in database)
+  const systemPrompt = await getConfig("system_prompt").catch(() => null);
+  if (systemPrompt) {
+    aiRoles.systemPrompt = systemPrompt;
+  }
+
+  console.log("System configurations loaded (env vars + Supabase)");
+  console.log(
+    `Facebook config: pageId=${fbConfig.pageId}, pageName=${fbConfig.pageName}`,
+  );
 };
 
 // Initialize system data when server starts and then start listening
