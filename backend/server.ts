@@ -813,9 +813,13 @@ const initializeSystem = async () => {
   }
 
   // Add system prompt to aiRoles (default if not in database)
-  const systemPrompt = await getConfig("system_prompt").catch(() => null);
-  if (systemPrompt) {
-    aiRoles.systemPrompt = systemPrompt;
+  try {
+    const systemPrompt = await getConfig("system_prompt");
+    if (systemPrompt) {
+      aiRoles.systemPrompt = systemPrompt;
+    }
+  } catch (err) {
+    // Use default system prompt
   }
 
   console.log("System configurations loaded (env vars + Supabase)");
