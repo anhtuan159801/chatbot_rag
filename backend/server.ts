@@ -2,6 +2,7 @@ import { InferenceClient } from "@huggingface/inference";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
 import "dotenv/config";
 import apiProxy from "./services/apiProxy.js";
 import knowledgeBaseService from "./services/knowledgeBaseService.js";
@@ -16,6 +17,22 @@ import {
   initializeSystemData,
 } from "./services/supabaseService.js";
 import { config } from "./src/config/index.js";
+
+// Load local knowledge
+function loadLocalKnowledge(): string {
+  try {
+    const knowledgePath = path.join(__dirname, "data/knowledge.json");
+    if (fs.existsSync(knowledgePath)) {
+      const data = JSON.parse(fs.readFileSync(knowledgePath, "utf-8"));
+      const entries = Object.values(data) as any[];
+      console.log(`[LOCAL_KB] Loaded ${entries.length} knowledge entries`);
+      return entries.map((e: any) => e.content).join("\n\n");
+    }
+  } catch (err) {
+    console.warn("[LOCAL_KB] Failed to load knowledge.json:", err);
+  }
+  return "";
+}
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
 
@@ -654,7 +671,13 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
         // RAG: Search knowledge base for relevant chunks
         console.log("[WEBHOOK] Step 5: Skipping RAG - direct AI response");
 
-        const prompt = `${systemPrompt}\n\nCâu hỏi: ${message_text}\n\nHãy trả lời bằng tiếng Việt, ngắn gọn, dễ hiểu và không sử dụng markdown.`;
+        // Load local knowledge for context
+const localKnowledge = loadLocalKnowledge();
+const knowledgeContext = localKnowledge 
+  ? `\n\n=== THÔNG TIN TỪ CƠ SỞ DỮ LIỆU NỘI BỘ ===\n${localKnowledge}\n=== HẾT THÔNG TIN ===\n\nKhi trả lời, hãy ưu tiên sử dụng thông tin trên nếu liên quan.` 
+  : "";
+
+const prompt = `${systemPrompt}${knowledgeContext}\n\nCâu hỏi: ${message_text}\n\nHãy trả lời bằng tiếng Việt, ngắn gọn, dễ hiểu và không sử dụng markdown.`;
 
         console.log("[WEBHOOK] Step 6: 🤖 Generating AI response...");
 
