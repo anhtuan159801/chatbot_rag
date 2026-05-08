@@ -1,9 +1,10 @@
 FROM node:20-alpine
 WORKDIR /app
 
-COPY package*.json ./
 COPY backend/package*.json ./backend/
-RUN npm ci --ignore-scripts --no-audit --no-fund --workspace=false
+COPY backend/package-lock.json ./backend/ 2>/dev/null || true
+
+RUN cd backend && npm install --ignore-scripts --no-audit --no-fund
 
 COPY backend ./backend/
 
