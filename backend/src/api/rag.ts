@@ -8,10 +8,43 @@ import {
 } from "../models/api.js";
 import { generateToken } from "../../middleware/auth.js";
 import crypto from "crypto";
-import { getClient, getAiRoles, getModels, searchByKeywords, searchByVector } from "../../services/supabaseService.js";
-import { embeddingService } from "../../services/embeddingService.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = express.Router();
+
+function loadLocalKnowledge(): string {
+  try {
+    const knowledgePath = path.join(__dirname, "../../data/knowledge.json");
+    if (fs.existsSync(knowledgePath)) {
+      const data = JSON.parse(fs.readFileSync(knowledgePath, "utf-8"));
+      const entries = Object.values(data) as any[];
+      return entries.map((e: any) => e.content).join("\n\n");
+    }
+  } catch (err) {
+    console.warn("[LOCAL_KB] Failed to load knowledge.json:", err);
+  }
+  return "";
+}
+
+function findRelevantKnowledge(question: string, knowledge: string): string {
+  const q = question.toLowerCase();
+  const keywords = [
+    "liên hệ", "số điện thoại", "điện thoại", "phone", "call",
+    "khu phố 69", "khu 69", "ban quản lý", "trưởng khu", "bí thư",
+    "chủ tịch", "công an phường", "phụ nữ", "đoàn", "khuyến học"
+  ];
+  
+  const hasKeyword = keywords.some(k => q.includes(k.toLowerCase()));
+  if (hasKeyword && knowledge) {
+    return knowledge;
+  }
+  return "";
+}
 
 router.post("/ask", async (req, res) => {
   try {
@@ -29,24 +62,15 @@ router.post("/ask", async (req, res) => {
     const startTime = Date.now();
 
     let relevantContext = "";
-    let sources: string[] = [];
+    let sources: string[] = ["Thông tin liên hệ Khu phố 69 - Lưu trữ nội bộ"];
     let chunksRetrieved = 0;
 
-    try {
-      const pg = await getClient();
-      if (pg) {
-        const keywordResults = await searchByKeywords(question, 5);
-        if (keywordResults.length > 0) {
-          relevantContext = keywordResults
-            .map((r: any) => r.content)
-            .join("\n\n");
-          sources = [...new Set(keywordResults.map((r: any) => r.metadata?.source || r.metadata?.content_url || "")).filter(Boolean)];
-          chunksRetrieved = keywordResults.length;
-          console.log(`[RAG] Found ${chunksRetrieved} relevant chunks`);
-        }
-      }
-    } catch (ragError) {
-      console.warn("[RAG] Search failed, continuing without context:", ragError);
+    const localKnowledge = loadLocalKnowledge();
+    const localContext = findRelevantKnowledge(question, localKnowledge);
+    if (localContext) {
+      relevantContext = localContext;
+      chunksRetrieved = 1;
+      console.log("[LOCAL_KB] Found relevant local knowledge");
     }
 
     let answer = "";
@@ -170,57 +194,27 @@ router.post("/add-knowledge", async (req, res) => {
       return;
     }
 
-    const pg = await getClient();
-    if (!pg) {
-      res.status(500).json({ error: "Database not connected" });
-      return;
+    const dataDir = path.join(__dirname, "../../data");
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
     }
 
-    const documentId = crypto.randomUUID();
+    const knowledgePath = path.join(dataDir, "knowledge.json");
+    let existingData: any = {};
     
-    await pg.query(
-      `INSERT INTO knowledge_base (id, name, type, size, content_url, status)
-       VALUES ($1, $2, $3, $4, $5, 'PROCESSING')
-       RETURNING id, name, type, status, upload_date`,
-      [documentId, title, "TEXT", `${(content.length / 1024).toFixed(2)} KB`, null],
-    );
-
-    const chunks = content.split(/\n\n+/).filter(c => c.trim());
-    let successCount = 0;
-
-    for (let i = 0; i < chunks.length; i++) {
-      try {
-        const embedding = await embeddingService.generateEmbedding(chunks[i]);
-        if (embedding) {
-          const embeddingStr = embedding.join(",");
-          await pg.query(
-            `INSERT INTO knowledge_chunks (knowledge_base_id, content, embedding, chunk_index, metadata)
-             VALUES ($1, $2, string_to_array($3, ',')::float4[]::vector, $4, $5)`,
-            [
-              documentId,
-              chunks[i],
-              embeddingStr,
-              i,
-              JSON.stringify({ source: title, type: "TEXT" }),
-            ],
-          );
-          successCount++;
-        }
-      } catch (chunkError) {
-        console.error(`Error processing chunk ${i}:`, chunkError);
-      }
+    if (fs.existsSync(knowledgePath)) {
+      existingData = JSON.parse(fs.readFileSync(knowledgePath, "utf-8"));
     }
 
-    await pg.query(
-      "UPDATE knowledge_base SET status = $1, vector_count = $2 WHERE id = $3",
-      [successCount > 0 ? "COMPLETED" : "FAILED", successCount, documentId],
-    );
+    const key = title.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+    existingData[key] = { title, content, updatedAt: new Date().toISOString() };
+
+    fs.writeFileSync(knowledgePath, JSON.stringify(existingData, null, 2));
 
     res.json({
       success: true,
-      message: `Đã thêm ${successCount} chunks vào cơ sở tri thức`,
-      documentId,
-      chunksCount: successCount,
+      message: `Đã thêm "${title}" vào cơ sở tri thức local`,
+      key,
     });
   } catch (error: any) {
     console.error("Error adding knowledge:", error);
