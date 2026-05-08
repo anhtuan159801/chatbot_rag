@@ -20,17 +20,27 @@ import { config } from "./src/config/index.js";
 
 // Load local knowledge
 function loadLocalKnowledge(): string {
-  try {
-    const knowledgePath = path.join(__dirname, "data/knowledge.json");
-    if (fs.existsSync(knowledgePath)) {
-      const data = JSON.parse(fs.readFileSync(knowledgePath, "utf-8"));
-      const entries = Object.values(data) as any[];
-      console.log(`[LOCAL_KB] Loaded ${entries.length} knowledge entries`);
-      return entries.map((e: any) => e.content).join("\n\n");
+  const possiblePaths = [
+    path.join(__dirname, "data/knowledge.json"),
+    path.join(__dirname, "../data/knowledge.json"),
+    path.join(process.cwd(), "data/knowledge.json"),
+    "/app/backend/data/knowledge.json",
+  ];
+
+  for (const knowledgePath of possiblePaths) {
+    console.log(`[LOCAL_KB] Trying path: ${knowledgePath}`);
+    try {
+      if (fs.existsSync(knowledgePath)) {
+        const data = JSON.parse(fs.readFileSync(knowledgePath, "utf-8"));
+        const entries = Object.values(data) as any[];
+        console.log(`[LOCAL_KB] ✅ Loaded ${entries.length} knowledge entries from ${knowledgePath}`);
+        return entries.map((e: any) => e.content).join("\n\n");
+      }
+    } catch (err) {
+      console.warn(`[LOCAL_KB] Failed at ${knowledgePath}:`, err);
     }
-  } catch (err) {
-    console.warn("[LOCAL_KB] Failed to load knowledge.json:", err);
   }
+  console.log("[LOCAL_KB] ❌ No knowledge file found");
   return "";
 }
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
