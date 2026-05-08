@@ -15,6 +15,7 @@ import {
   updateAiRoles,
   initializeSystemData,
 } from "./services/supabaseService.js";
+import { config } from "./src/config/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -594,6 +595,21 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
         chatbotModel = models.find(
           (m) => m.is_active && m.provider === "gemini",
         );
+      }
+
+      // Fallback to config if no model in database
+      if (!chatbotModel && config.ai.gemini.apiKey) {
+        console.warn(
+          "[WEBHOOK] ⚠ No model in database, using config fallback",
+        );
+        chatbotModel = {
+          id: "config-gemini",
+          provider: "gemini",
+          name: "Gemini (Config)",
+          model_string: config.ai.gemini.model,
+          api_key: config.ai.gemini.apiKey,
+          is_active: true,
+        };
       }
 
       if (!chatbotModel) {
