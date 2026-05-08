@@ -18,9 +18,10 @@ export const config = {
     key: process.env.SUPABASE_KEY || '',
   },
   ai: {
+    defaultProvider: process.env.DEFAULT_AI_PROVIDER || 'openai',
     openai: {
       apiKey: process.env.OPENAI_API_KEY || '',
-      model: process.env.OPENAI_MODEL || 'gpt-4',
+      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
     },
     gemini: {
       apiKey: process.env.GEMINI_API_KEY || '',

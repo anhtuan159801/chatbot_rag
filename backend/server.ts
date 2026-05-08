@@ -15,8 +15,11 @@ import {
   updateAiRoles,
   initializeSystemData,
 } from "./services/supabaseService.js";
-const GEMINI_API_KEY = "AIzaSyDM1plwdxfryE6r-bOMWE0ZP_IrkPbz4D0";
-const GEMINI_MODEL = "gemini-3-flash-preview";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "AIzaSyDM1plwdxfryE6r-bOMWE0ZP_IrkPbz4D0";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
+
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -594,21 +597,25 @@ async function processMessageAsync(sender_psid: string, message_text: string) {
           `[WEBHOOK] ⚠ Chatbot model '${chatbotModelId}' not found, searching for fallback...`,
         );
         chatbotModel = models.find(
-          (m) => m.is_active && m.provider === "gemini",
+          (m) => m.is_active && m.provider === config.ai.defaultProvider,
         );
       }
 
       // Fallback to config if no model in database
-      if (!chatbotModel && GEMINI_API_KEY) {
+      const defaultProvider = config.ai.defaultProvider;
+      const fallbackApiKey = defaultProvider === 'openai' ? OPENAI_API_KEY : (defaultProvider === 'gemini' ? GEMINI_API_KEY : '');
+      const fallbackModel = defaultProvider === 'openai' ? OPENAI_MODEL : (defaultProvider === 'gemini' ? GEMINI_MODEL : 'gpt-4o-mini');
+
+      if (!chatbotModel && fallbackApiKey) {
         console.warn(
-          "[WEBHOOK] ⚠ No model in database, using config fallback",
+          `[WEBHOOK] ⚠ No model in database, using config fallback: ${defaultProvider}`,
         );
         chatbotModel = {
-          id: "config-gemini",
-          provider: "gemini",
-          name: "Gemini (Config)",
-          model_string: GEMINI_MODEL,
-          api_key: GEMINI_API_KEY,
+          id: `config-${defaultProvider}`,
+          provider: defaultProvider,
+          name: `${defaultProvider.toUpperCase()} (Config)`,
+          model_string: fallbackModel,
+          api_key: fallbackApiKey,
           is_active: true,
         };
       }
